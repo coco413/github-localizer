@@ -114,6 +114,11 @@ test('signed-in repository preserves notification-menu and star controls', { tim
 test('a workflow run translates result and sign-in controls while retaining raw logs', { timeout: 12_000 }, async (t) => {
   const page = await openFixture(t, '/actions/runs/42', 'action-run');
   await page.getByRole('link', { name: '登录后查看日志' }).waitFor({ timeout: 3_000 });
+  const summary = page.getByRole('link', { name: '摘要', exact: true });
+  await summary.waitFor({ timeout: 3_000 });
+  assert.equal(await summary.getAttribute('href'), '/octocat/Hello-World/actions/runs/42');
+  assert.equal(await page.getByRole('link', { name: 'Summary', exact: true }).getAttribute('href'),
+    '/octocat/Hello-World/actions/runs/42/job/1');
   assert.equal(await page.locator('[aria-label="Workflow run summary"] .h4').innerText(), '失败');
   assert.equal(await page.locator('pre').innerText(), 'Failure');
 });

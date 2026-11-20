@@ -2,7 +2,7 @@
   const deleteDialog = ':is(dialog, [role="dialog"]):is([aria-label="Delete issue"], [aria-label="删除议题"])';
   const reviewDialog = ':is(dialog, [role="dialog"]):is([aria-label="Review changes"], [aria-label="审核更改"])';
   const filterDialog = ':is(dialog, [role="dialog"]):is([aria-label="Filter issues"], [aria-label="筛选议题"])';
-  const prTabs = 'nav:is(.tabnav-tabs, [aria-label="Pull request tabs"], [aria-label="拉取请求（PR）标签页"])';
+  const prTabs = 'nav:is(.tabnav-tabs, [aria-label="Pull request tabs"], [aria-label="拉取请求（PR）标签页"], [aria-label="PR 标签页"])';
   const search = 'input[type="search"], input[role="combobox"], button';
   const states = { Open: '未关闭', Closed: '已关闭' };
   const pullStates = { ...states, Merged: '已合并', Draft: '草稿' };
@@ -65,12 +65,12 @@
       [deleteDialog, { 'Delete issue': '删除议题' }],
     ],
     pulls: [
-      ['h1, h2', { 'All pull requests': '所有拉取请求（PR）', 'Pull requests': '拉取请求（PR）' }],
+      ['h1, h2', { 'All pull requests': { beginner: '所有拉取请求（PR）', professional: '所有 PR' }, 'Pull requests': { beginner: '拉取请求（PR）', professional: 'PR' } }],
       [`${search}, #repo-pulls-dashboard-filter, label[for="repo-pulls-dashboard-filter-input"]`, {
-        'Search pull requests': '搜索拉取请求（PR）',
+        'Search pull requests': { beginner: '搜索拉取请求（PR）', professional: '搜索 PR' },
       }],
       ['a[href*="/compare"], a[href*="/compare"] [data-component="text"]', {
-        'New pull request': '新建拉取请求（PR）',
+        'New pull request': { beginner: '新建拉取请求（PR）', professional: '新建 PR' },
       }],
       [`${filters}, #repo-pulls-dashboard-filter button`, listControls],
       [stateLink, states],
@@ -83,13 +83,13 @@
       [`${prTabs} :is(a, a > span)`, {
         Conversation: '讨论', Commits: '提交', Checks: '检查', 'Files changed': '变更文件',
       }],
-      [prTabs, { 'Pull request tabs': '拉取请求（PR）标签页' }],
+      [prTabs, { 'Pull request tabs': { beginner: '拉取请求（PR）标签页', professional: 'PR 标签页' } }],
       [`${reviewDialog} :is(button, label)`, {
         Comment: '评论', Approve: '批准', 'Request changes': '要求修改', 'Submit review': '提交审核',
       }],
       [`button, ${reviewDialog}`, { 'Review changes': '审核更改' }],
       ['.merge-pr button, #partial-pull-merging button', {
-        'Merge pull request': '合并拉取请求（PR）',
+        'Merge pull request': { beginner: '合并拉取请求（PR）', professional: '合并 PR' },
         'Squash and merge': '压缩提交后合并',
         'Rebase and merge': '变基后合并',
         'Confirm merge': '确认合并',

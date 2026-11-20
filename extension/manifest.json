@@ -3,7 +3,23 @@
   "name": "GitHub 译伴",
   "version": "1.0.0",
   "description": "在浏览器中离线汉化 GitHub 界面。",
-  "permissions": ["scripting"],
-  "optional_host_permissions": ["https://github.com/*"],
-  "action": { "default_popup": "popup.html" }
+  "permissions": [
+    "scripting",
+    "storage",
+    "activeTab"
+  ],
+  "optional_host_permissions": [
+    "https://github.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "commands": {
+    "toggle-original": {
+      "suggested_key": {
+        "default": "Alt+Shift+Y"
+      },
+      "description": "查看原文／恢复译文"
+    }
+  }
 }

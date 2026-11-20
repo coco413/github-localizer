@@ -17,14 +17,16 @@ function extensionEvent() {
 }
 
 test('approving the popup request enables translation on already open GitHub tabs', async () => {
-  const [manifest, popupScript, backgroundScript] = await Promise.all(
-    ['manifest.json', 'popup.js', 'background.js'].map(
+  const [manifest, defaults, popupScript, backgroundScript] = await Promise.all(
+    ['manifest.json', 'preferences.js', 'popup.js', 'background.js'].map(
       (name) => readFile(new URL(`../dist/chrome/${name}`, import.meta.url), 'utf8'),
     ),
   );
   const [site] = JSON.parse(manifest).optional_host_permissions;
   const onAdded = extensionEvent();
   const onClick = extensionEvent();
+  const onMessage = extensionEvent();
+  const control = { addEventListener() {} };
   const status = {};
   const button = { addEventListener: (_, callback) => onClick.addListener(callback) };
   const calls = [];
@@ -33,7 +35,16 @@ test('approving the popup request enables translation on already open GitHub tab
   // The browser owns the native prompt. This boundary supplies the user's
   // approval and delivers the corresponding WebExtensions event.
   const chrome = {
-    runtime: { onInstalled: extensionEvent(), onStartup: extensionEvent() },
+    runtime: {
+      onInstalled: extensionEvent(),
+      onStartup: extensionEvent(),
+      onMessage,
+      sendMessage(message) {
+        return new Promise((resolve) => void onMessage.dispatch(message, {}, resolve));
+      },
+    },
+    commands: { onCommand: extensionEvent() },
+    storage: { onChanged: extensionEvent(), local: { get: async (values) => values, set: async () => {} } },
     permissions: {
       async contains() {
         return authorized;
@@ -55,22 +66,30 @@ test('approving the popup request enables translation on already open GitHub tab
         calls.push(['register', registration.matches[0], ...registration.js]);
       },
       async executeScript(script) {
+        if (script.func) return [{ result: true }];
         calls.push(['execute', script.target.tabId, ...script.files]);
       },
     },
     tabs: {
-      async query({ url }) {
-        assert.equal(url, site);
-        return [{ id: 42 }];
+      async sendMessage() {
+        return { original: false };
+      },
+      async query({ url, active }) {
+        assert.ok(active || url === site);
+        return [{ id: 42, url: 'https://github.com/octocat/Hello-World' }];
       },
     },
   };
 
   runInNewContext(backgroundScript, { chrome });
-  runInNewContext(popupScript, {
+  const popupContext = {
+    URL,
+    setTimeout,
     chrome,
-    document: { querySelector: (selector) => ({ '#status': status, '#authorize': button })[selector] },
-  });
+    document: { querySelector: (selector) => ({ '#status': status, '#authorize': button })[selector] ?? control },
+  };
+  runInNewContext(defaults, popupContext);
+  runInNewContext(popupScript, popupContext);
   await setImmediate();
   assert.equal(status.textContent, '未授权');
   assert.deepEqual(calls, []);
