@@ -34,13 +34,13 @@ globalThis.githubLocalizerRuntime?.register('extended-pages', () => {
     const home = document.querySelector('react-app[app-name="code-view"]');
     if (!home) return;
     translate(home, '[data-testid="repo-header-actions"] [data-component="text"]', {
-      Notifications: '通知', Watch: '关注', Unwatch: '取消关注', Fork: '复刻', Star: '加星标', Starred: '已加星标',
+      Notifications: '通知', Watch: '关注', Unwatch: '取消关注', Fork: { beginner: '复刻', professional: 'Fork' }, Star: '加星标', Starred: '已加星标',
     });
     translate(home, '[data-testid="repo-header-actions"] :is([role="menuitem"], [role="menuitemradio"]) [data-component="text"]', {
       'Participating and @mentions': '参与和提及',
     });
     const labels = {
-      'You must be signed in to fork a repository': '登录后才能复刻仓库',
+      'You must be signed in to fork a repository': { beginner: '登录后才能复刻仓库', professional: '登录后才能 Fork 仓库' },
       'You must be signed in to change notification settings': '登录后才能更改通知设置',
       'Star this repository': '为此仓库加星标',
       'Unstar this repository': '移除此仓库的星标',
