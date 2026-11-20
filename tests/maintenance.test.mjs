@@ -85,7 +85,9 @@ test('publishing reports each translation finding only once, including previousl
     firstDetectedAt: '2026-01-01T00:00:00.000Z', samples: [{ url: 'https://github.com/example/repo' }] };
   const report = { dictionaryVersion: '1.0.0+fixture', findings: [finding, { kind: 'unavailable' }, { kind: 'retained' }] };
   await publishFindings(report, tracker);
-  await publishFindings({ ...report, findings: [{ ...finding, firstDetectedAt: '2026-02-01T00:00:00.000Z' }] }, tracker);
+  const repeated = { ...finding, firstDetectedAt: '2026-02-01T00:00:00.000Z' };
+  await publishFindings({ ...report, findings: [repeated] }, tracker);
+  equal(repeated.firstDetectedAt, '2026-01-01T00:00:00.000Z');
   equal(issues.length, 1);
   equal(finding.issue, 64);
   match(issues[0].body, /2026-01-01T00:00:00.000Z/);

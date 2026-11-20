@@ -156,12 +156,23 @@ async function run() {
   const results = [];
   try {
     const page = await browser.newPage({ locale: 'en-US' });
-    const storageState = process.env.INSPECTION_AUTH_STATE
-      ? JSON.parse(process.env.INSPECTION_AUTH_STATE) : process.env.INSPECTION_AUTH_STATE_FILE;
-    const signedInPage = samples.some(sample => sample.authenticated)
-      ? await browser.newPage({ locale: 'en-US', storageState }) : null;
+    let signedInPage;
+    if (samples.some(sample => sample.authenticated)) {
+      try {
+        const storageState = process.env.INSPECTION_AUTH_STATE
+          ? JSON.parse(process.env.INSPECTION_AUTH_STATE) : process.env.INSPECTION_AUTH_STATE_FILE;
+        signedInPage = await browser.newPage({ locale: 'en-US', storageState });
+      } catch {
+        // Storage state can contain session cookies. Keep diagnostics limited to its availability.
+      }
+    }
     for (const sample of samples) {
-      results.push(sample.url ? await inspectPage(sample.authenticated ? signedInPage : page, sample) : sample);
+      if (!sample.url) results.push(sample);
+      else if (sample.authenticated && !signedInPage) {
+        results.push({ url: sample.url, state: sample.state, incomplete: true, findings: [{
+          kind: 'unavailable', control: sample.state, original: null, reason: 'Inspection storage state could not be loaded',
+        }] });
+      } else results.push(await inspectPage(sample.authenticated ? signedInPage : page, sample));
     }
   } finally {
     await browser.close();
