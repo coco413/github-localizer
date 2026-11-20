@@ -45,6 +45,9 @@ async function openFixture(t, path, fixture) {
 
 test('Issues list localizes the issue filter and preserves its query', async (t) => {
   const page = await openFixture(t, '/issues', 'issues-list');
+  const issue = page.getByRole('link', { name: '新建议题', exact: true });
+  assert.equal(await issue.getAttribute('href'), '/login?return_to=https%3A%2F%2Fgithub.com%2Foctocat%2FHello-World%2Fissues%2Fnew');
+  await page.getByRole('link', { name: 'New issue', exact: true }).waitFor();
   const search = page.getByRole('searchbox', { name: '搜索议题', exact: true });
   await search.waitFor();
   assert.equal(await search.inputValue(), 'is:issue state:open');
@@ -62,7 +65,7 @@ test('the Issues filter opens by keyboard and localizes its menu while preservin
   await dialog.waitFor({ state: 'hidden' });
   assert.equal(await filters.evaluate((element) => element === document.activeElement), true);
   await page.getByRole('link', { name: '未关闭 3', exact: true }).waitFor();
-  await page.getByRole('heading', { name: '没有结果', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '没有符合搜索条件的结果', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Open', exact: true }).waitFor();
   await page.getByRole('button', { name: 'OPEN', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Open 3', exact: true }).waitFor();
@@ -70,7 +73,9 @@ test('the Issues filter opens by keyboard and localizes its menu while preservin
 
 test('Issue detail localizes state and deletion controls while preserving user content', async (t) => {
   const page = await openFixture(t, '/issues/10', 'issue-detail');
+  const state = page.getByTestId('header-state');
   await page.getByText('未关闭', { exact: true }).waitFor();
+  assert.equal(await state.locator('svg circle').getAttribute('r'), '5');
   const dialog = page.getByRole('dialog', { name: '删除议题', exact: true });
   await dialog.getByText('删除此议题后将无法恢复。', { exact: true }).waitFor();
   await dialog.getByRole('button', { name: '删除此议题', exact: true }).waitFor();
@@ -101,6 +106,9 @@ test('PR list localizes only the compare link and preserves a PR title with iden
 
 test('PR detail localizes review and merge controls while preserving the title, draft and Diff', async (t) => {
   const page = await openFixture(t, '/pull/10', 'pr-detail');
+  const state = page.getByText('已合并', { exact: true });
+  await state.waitFor();
+  assert.equal(await state.locator('svg path').getAttribute('d'), 'M1 1h4');
   const tabs = page.getByRole('navigation', { name: '拉取请求（PR）标签页', exact: true });
   await tabs.getByRole('link', { name: '变更文件', exact: true }).waitFor();
   const review = page.getByRole('dialog', { name: '审核更改', exact: true });

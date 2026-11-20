@@ -5,6 +5,7 @@
   const prTabs = 'nav:is(.tabnav-tabs, [aria-label="Pull request tabs"], [aria-label="拉取请求（PR）标签页"])';
   const search = 'input[type="search"], input[role="combobox"], button';
   const states = { Open: '未关闭', Closed: '已关闭' };
+  const pullStates = { ...states, Merged: '已合并', Draft: '草稿' };
   const filters = ':is(header, [role="toolbar"], .table-list-header) :is(button, button > span, button [data-component="text"])';
   const stateLink = 'a[href*="state%3A"], a[href*="state:"]';
   const stateLinkLabel = ':is(a[href*="state%3A"], a[href*="state:"]) > :is(div, span):not([data-component="CounterLabel"])';
@@ -31,7 +32,8 @@
     'Compact display density': '紧凑显示',
   };
   const empty = { 'No results': '没有结果', 'No results found': '未找到结果' };
-  const newIssue = ['a[href*="/issues/new"]', { 'New issue': '新建议题' }];
+  const newIssueLink = ':is(a[href*="/issues/new"], a[data-variant="primary"][href^="/login?return_to="][href*="%2fissues%2fnew" i])';
+  const newIssue = [`${newIssueLink}, ${newIssueLink} [data-component="text"]`, { 'New issue': '新建议题' }];
 
   globalThis.githubLocalizerIssuePrPortals = { issues: filterDialog, issuesDetail: deleteDialog, pullDetail: reviewDialog };
   globalThis.githubLocalizerIssuePrWords = {
@@ -44,10 +46,13 @@
       [`${filterDialog} button`, states],
       [stateLink, states],
       [stateLinkLabel, states],
-      ['h2, h3', empty],
+      ['h2, h3, [data-component="Blankslate.Heading"]', {
+        ...empty, 'No results matched your search': '没有符合搜索条件的结果',
+      }],
     ],
     issuesDetail: [
       newIssue,
+      ['[data-testid="header-state"][data-component="StateLabel"]', states, { icon: true }],
       ['[data-testid="issue-state"], [data-testid="issue-state"] > span, .State, .State > span', states],
       ['h2', { Description: '描述', Activity: '活动' }],
       ['button', {
@@ -73,9 +78,8 @@
       ['h2, h3', empty],
     ],
     pullDetail: [
-      ['[data-testid="pull-request-state"], .State, .State > span', {
-        ...states, Merged: '已合并', Draft: '草稿',
-      }],
+      ['[data-component="StateLabel"][data-status^="pull"]', pullStates, { icon: true }],
+      ['[data-testid="pull-request-state"], .State, .State > span', pullStates],
       [`${prTabs} :is(a, a > span)`, {
         Conversation: '讨论', Commits: '提交', Checks: '检查', 'Files changed': '变更文件',
       }],
