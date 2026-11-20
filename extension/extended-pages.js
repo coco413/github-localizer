@@ -24,6 +24,9 @@
     translate(home, '[data-testid="repo-header-actions"] [data-component="text"]', {
       Notifications: '通知', Watch: '关注', Unwatch: '取消关注', Fork: '复刻', Star: '加星标', Starred: '已加星标',
     });
+    translate(home, '[data-testid="repo-header-actions"] :is([role="menuitem"], [role="menuitemradio"]) [data-component="text"]', {
+      'Participating and @mentions': '参与和提及',
+    });
     const labels = {
       'You must be signed in to fork a repository': '登录后才能复刻仓库',
       'You must be signed in to change notification settings': '登录后才能更改通知设置',

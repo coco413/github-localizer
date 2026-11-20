@@ -45,6 +45,8 @@ test('milestone tabs localize the state without changing the count, link, or mat
   const page = await openFixture(t, '/milestones', 'milestones');
   const open = page.getByRole('link', { name: '进行中 2', exact: true });
   await open.waitFor({ timeout: 3_000 });
+  await page.getByRole('heading', { name: '里程碑', level: 1 }).waitFor({ timeout: 1_000 });
+  await page.getByRole('button', { name: '排序', exact: true }).waitFor({ timeout: 1_000 });
   assert.equal(await open.getAttribute('href'), '/octocat/Hello-World/milestones');
   assert.equal(await page.getByRole('heading', { name: 'Open', exact: true }).count(), 1);
   await page.getByRole('heading', { name: '你还没有创建任何里程碑。' }).waitFor({ timeout: 3_000 });
@@ -72,15 +74,29 @@ test('release controls localize while notes, tag names, and download destination
   assert.equal(await page.locator('.markdown-body').innerText(), 'Compare Assets Latest');
 });
 
-test('repository header controls retain their counts and links in signed-out and signed-in layouts', { timeout: 12_000 }, async (t) => {
-  const page = await openFixture(t, '', 'repository-controls', { width: 390, height: 800 });
-  const fork = page.getByRole('link', { name: '登录后才能复刻仓库' });
-  await fork.waitFor({ timeout: 3_000 });
-  assert.equal(await fork.getAttribute('href'), '/login?return_to=%2Foctocat%2FHello-World');
-  assert.equal(await page.locator('[data-testid="fork-button"] strong').innerText(), '7');
-  await page.getByRole('button', { name: '已加星标', exact: true }).waitFor();
-  await page.getByRole('heading', { name: '关于', exact: true }).waitFor();
-  assert.equal(await page.locator('article').innerText(), 'About');
+for (const width of [390, 1280]) {
+  test(`signed-out repository controls work at ${width}px`, { timeout: 12_000 }, async (t) => {
+    const page = await openFixture(t, '', 'repository-controls', { width, height: 800 });
+    const fork = page.getByRole('link', { name: '登录后才能复刻仓库' });
+    await fork.waitFor({ timeout: 3_000 });
+    assert.equal(await fork.getAttribute('href'), '/login?return_to=%2Foctocat%2FHello-World');
+    assert.equal(await fork.locator('strong').innerText(), '7');
+    await page.getByRole('link', { name: '登录后才能更改通知设置' }).waitFor({ timeout: 1_000 });
+    const layout = width < 768 ? 'SplitPageLayout.Header' : 'SplitPageLayout.Pane';
+    const about = page.locator(`[data-component="${layout}"]`).getByRole('heading', { name: '关于', exact: true });
+    await about.waitFor({ timeout: 1_000 });
+    assert.equal(await page.getByRole('heading', { name: '关于', exact: true }).count(), 1);
+    assert.equal(await page.locator('article').innerText(), 'About');
+  });
+}
+
+test('signed-in repository preserves notification-menu and star controls', { timeout: 12_000 }, async (t) => {
+  const page = await openFixture(t, '', 'repository-signed-in', { width: 390, height: 800 });
+  await page.getByRole('button', { name: '关注', exact: true }).click({ timeout: 3_000 });
+  await page.getByRole('menuitem', { name: '参与和提及', exact: true }).waitFor({ timeout: 1_000 });
+  const star = page.getByRole('button', { name: '移除此仓库的星标', exact: true });
+  await star.waitFor({ timeout: 1_000 });
+  assert.equal(await star.locator('strong').innerText(), '9');
 });
 
 test('a workflow run translates result and sign-in controls while retaining raw logs', { timeout: 12_000 }, async (t) => {
