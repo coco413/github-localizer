@@ -68,7 +68,7 @@
       translate(document, 'main h1[data-component="PH_Title"]', { 'All workflows': '所有工作流' });
     }
     translate(document, 'main [aria-label="Workflow run filters"] :is(button, summary) [data-component="text"]', {
-      Event: '事件', Status: '状态', Branch: '分支', Actor: '触发者',
+      Workflow: '工作流', Event: '事件', Status: '状态', Branch: '分支', Actor: '触发者',
     });
     translate(document, 'main [aria-label="Workflow run filters"] [role="menuitem"]', states);
     translate(document, 'main .blankslate h2, main [aria-label="Workflow runs results"] h2', {

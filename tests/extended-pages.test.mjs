@@ -55,6 +55,7 @@ test('milestone tabs localize the state without changing the count, link, or mat
 test('workflow filters and an empty result localize at narrow width while run names and logs stay intact', { timeout: 12_000 }, async (t) => {
   const page = await openFixture(t, '/actions', 'actions', { width: 390, height: 800 });
   await page.getByRole('link', { name: '所有工作流', exact: true }).waitFor({ timeout: 3_000 });
+  await page.getByRole('button', { name: '工作流', exact: true }).waitFor({ timeout: 3_000 });
   await page.getByRole('button', { name: '状态', exact: true }).click();
   await page.getByRole('menuitem', { name: '失败', exact: true }).waitFor({ timeout: 3_000 });
   await page.getByRole('link', { name: 'All workflows', exact: true }).waitFor();
