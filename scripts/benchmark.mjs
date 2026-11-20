@@ -1,91 +1,130 @@
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { createConnection, createServer } from 'node:net';
+import { spawn } from 'node:child_process';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { arch, cpus, release, tmpdir, totalmem, type } from 'node:os';
 import { join, resolve } from 'node:path';
-import { chromium, firefox } from 'playwright';
+import { chromium } from 'playwright';
 
 const url = 'https://github.com/octocat/Hello-World';
 const fixture = await readFile(new URL('../tests/fixtures/repository.html', import.meta.url), 'utf8');
 const tested = process.argv.slice(2);
 const targets = tested.length ? tested : ['chrome', 'edge', 'firefox'];
 
-async function installFirefox(addonPath, port) {
-  // Firefox Remote Debugging Protocol frames JSON with a UTF-8 byte count.
-  const socket = createConnection(port, '127.0.0.1');
-  socket.setTimeout(5_000, () => socket.destroy(new Error('Firefox debugger timed out')));
-  let input = Buffer.alloc(0);
-  const frames = socket[Symbol.asyncIterator]();
-  async function receive() {
-    while (true) {
-      const end = input.indexOf(':');
-      if (end !== -1) {
-        const size = Number(input.subarray(0, end).toString());
-        const after = end + 1 + size;
-        if (input.length >= after) {
-          const reply = JSON.parse(input.subarray(end + 1, after).toString());
-          input = input.subarray(after);
-          assert.equal(reply.error, undefined, JSON.stringify(reply));
-          return reply;
-        }
-      }
-      const frame = await frames.next();
-      assert.equal(frame.done, false, 'Firefox closed its debugger connection');
-      input = Buffer.concat([input, frame.value]);
-    }
-  }
-
-  function send(message) {
-    const json = JSON.stringify(message);
-    socket.write(`${Buffer.byteLength(json)}:${json}`);
+async function launchFirefox(profile, binary) {
+  // Firefox exposes the standard WebDriver BiDi endpoint on loopback.
+  await mkdir(profile, { recursive: true });
+  await writeFile(join(profile, 'user.js'), 'user_pref("remote.experimental.enabled", true);');
+  const browser = spawn(binary, ['--headless', '--no-remote', '--profile', profile,
+    '--remote-debugging-port', '0', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const finished = new Promise((resolve) => browser.once('close', resolve));
+  let socket;
+  async function close() {
+    socket?.close();
+    browser.kill();
+    await finished;
   }
 
   try {
-    assert.equal((await receive()).applicationType, 'browser');
-    send({ to: 'root', type: 'getRoot' });
-    const { addonsActor } = await receive();
-    send({ to: addonsActor, type: 'installTemporaryAddon', addonPath });
-    assert.equal((await receive()).addon.id, 'github-localizer@coco413.github.io');
-  } finally {
-    socket.destroy();
-  }
-}
+    const endpoint = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Firefox startup timed out')), 15_000);
+      browser.once('error', (err) => { clearTimeout(timeout); reject(err); });
+      browser.once('exit', (code) => { clearTimeout(timeout); reject(new Error(`Firefox exited: ${code}`)); });
+      browser.stderr.on('data', (chunk) => {
+        const match = String(chunk).match(/WebDriver BiDi listening on (ws:\/\/[^\s]+)/);
+        if (match) {
+          clearTimeout(timeout);
+          resolve(match[1] + '/session');
+        }
+      });
+    });
+    socket = new WebSocket(endpoint);
+    await new Promise((resolve, reject) => {
+      socket.addEventListener('open', resolve, { once: true });
+      socket.addEventListener('error', reject, { once: true });
+    });
+    const pending = new Map();
+    let next = 0;
+    let intercept;
+    let interceptionFailure;
+    function send(method, params) {
+      const id = ++next;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error(`Firefox command timed out: ${method}`, { cause: interceptionFailure }));
+        }, 10_000);
+        pending.set(id, (message) => {
+          clearTimeout(timer);
+          if (message.type === 'error') reject(new Error(`${method}: ${message.message}`));
+          else resolve(message.result);
+        });
+        socket.send(JSON.stringify({ id, method, params }));
+      });
+    }
 
-async function debuggerPort() {
-  const server = createServer();
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  const { port } = server.address();
-  await new Promise((done) => server.close(done));
-  return port;
+    socket.addEventListener('message', ({ data }) => {
+      const message = JSON.parse(data);
+      const finish = pending.get(message.id);
+      if (finish) {
+        pending.delete(message.id);
+        finish(message);
+      }
+      if (message.method === 'network.beforeRequestSent' && message.params.isBlocked) {
+        void intercept(message.params.request).catch((err) => { interceptionFailure = err; });
+      }
+    });
+    const { capabilities } = await send('session.new', { capabilities: {} });
+    assert.equal(capabilities.browserName, 'firefox');
+    const { contexts: [{ context }] } = await send('browsingContext.getTree', {});
+    return {
+      binary, version: capabilities.browserVersion, build: capabilities['moz:buildID'], close,
+      async install(path) {
+        const { extension } = await send('webExtension.install', {
+          extensionData: { type: 'path', path },
+        });
+        assert.equal(extension, 'github-localizer@coco413.github.io');
+      },
+      async route(html) {
+        const headers = [{ name: 'content-type', value: { type: 'string', value: 'text/html; charset=utf-8' } }];
+        const body = { type: 'base64', value: Buffer.from(html).toString('base64') };
+        intercept = ({ url: requestUrl, request }) => requestUrl === url
+          ? send('network.provideResponse', { request, statusCode: 200, headers, body })
+          : send('network.failRequest', { request });
+        await send('session.subscribe', { events: ['network.beforeRequestSent'], contexts: [context] });
+        await send('network.addIntercept', { phases: ['beforeRequestSent'], contexts: [context] });
+      },
+      goto: () => send('browsingContext.navigate', { context, url, wait: 'complete' }),
+      reload: () => send('browsingContext.reload', { context, wait: 'complete' }),
+      async evaluate(callback) {
+        const reply = await send('script.evaluate', {
+          expression: `(${callback})()`, awaitPromise: true, target: { context },
+        });
+        assert.equal(reply.type, 'success', reply.exceptionDetails?.text);
+        return reply.result.value;
+      },
+    };
+  } catch (error) {
+    await close();
+    throw error;
+  }
 }
 
 async function launch(browser, directory) {
   const profile = join(directory, 'profile');
   const executablePath = process.env[`${browser.toUpperCase()}_EXECUTABLE`];
-  if (browser === 'firefox') {
-    const port = await debuggerPort();
-    return {
-      context: await firefox.launchPersistentContext(profile, {
-        executablePath,
-        args: ['--start-debugger-server', String(port)],
-        firefoxUserPrefs: {
-          'devtools.debugger.remote-enabled': true,
-          'devtools.debugger.prompt-connection': false,
-        },
-      }),
-      install: (path) => installFirefox(path, port),
-      binary: executablePath ?? firefox.executablePath(),
-    };
-  }
+  if (browser === 'firefox') return launchFirefox(profile, executablePath ?? (
+    process.platform === 'darwin' ? '/Applications/Firefox.app/Contents/MacOS/firefox'
+      : process.platform === 'win32' ? 'C:\\Program Files\\Mozilla Firefox\\firefox.exe' : 'firefox'
+  ));
+
+  const channel = browser === 'edge' ? 'msedge' : 'chrome';
   const context = await chromium.launchPersistentContext(profile, {
-    ...(executablePath ? { executablePath } : { channel: browser === 'edge' ? 'msedge' : 'chrome' }),
+    ...(executablePath ? { executablePath } : { channel }),
     ignoreDefaultArgs: ['--disable-extensions'],
     args: ['--enable-unsafe-extension-debugging'],
   });
+  const page = await context.newPage();
   return {
-    context,
     async install(path) {
       const session = await context.browser().newBrowserCDPSession();
       try {
@@ -96,7 +135,17 @@ async function launch(browser, directory) {
         await session.detach();
       }
     },
-    binary: executablePath ?? (browser === 'edge' ? 'msedge' : 'chrome'),
+    route: (html) => context.route('**/*', (route) => (
+      route.request().url() === url
+        ? route.fulfill({ contentType: 'text/html; charset=utf-8', body: html })
+        : route.abort()
+    )),
+    goto: () => page.goto(url),
+    reload: () => page.reload(),
+    evaluate: (callback) => page.evaluate(callback),
+    close: () => context.close(),
+    binary: executablePath ?? channel,
+    version: context.browser().version(),
   };
 }
 
@@ -145,7 +194,7 @@ function summarize(samples) {
 async function benchmark(browser) {
   assert.ok(['chrome', 'edge', 'firefox'].includes(browser), `Unknown browser: ${browser}`);
   const directory = await mkdtemp(join(tmpdir(), 'github-localizer-benchmark-'));
-  let context;
+  let instance;
   try {
     const extension = join(directory, 'extension');
     await cp(resolve('dist', browser), extension, { recursive: true });
@@ -156,19 +205,12 @@ async function benchmark(browser) {
     delete manifest.optional_host_permissions;
     await writeFile(path, JSON.stringify(manifest));
 
-    const instance = await launch(browser, directory);
-    ({ context } = instance);
+    instance = await launch(browser, directory);
     await instance.install(extension);
-    const html = sampleFixture();
-    await context.route('**/*', (route) => (
-      route.request().url() === url
-        ? route.fulfill({ contentType: 'text/html; charset=utf-8', body: html })
-        : route.abort()
-    ));
-    const page = await context.newPage();
-    await page.goto(url);
-    await page.evaluate(() => window.first);
-    const userAgent = await page.evaluate(() => navigator.userAgent);
+    await instance.route(sampleFixture());
+    await instance.goto();
+    await instance.evaluate(() => window.first);
+    const userAgent = await instance.evaluate(() => navigator.userAgent);
     assert.match(userAgent, {
       chrome: /Chrome\//,
       edge: /Edg\//,
@@ -178,19 +220,22 @@ async function benchmark(browser) {
     const first = [];
     const dynamic = [];
     for (let i = 0; i < 30; i++) {
-      await page.reload();
-      first.push(await page.evaluate(() => window.first));
-      dynamic.push(await page.evaluate(() => window.dynamic()));
+      await instance.reload();
+      first.push(await instance.evaluate(() => window.first));
+      dynamic.push(await instance.evaluate(() => window.dynamic()));
     }
     return {
       browser, binary: instance.binary, userAgent,
-      version: context.browser().version(),
+      version: instance.version, build: instance.build,
       first: summarize(first), dynamic: summarize(dynamic),
-      idleWrites: await page.evaluate(() => window.idle()),
+      idleWrites: await instance.evaluate(() => window.idle()),
     };
   } finally {
-    await context?.close();
-    await rm(directory, { recursive: true, force: true });
+    try {
+      await instance?.close();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 }
 

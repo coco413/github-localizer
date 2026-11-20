@@ -4,17 +4,16 @@
 
 ## 复跑
 
-先安装 Google Chrome、Microsoft Edge 和 Node.js 24，再执行：
+先安装 Google Chrome、Microsoft Edge、Mozilla Firefox 和 Node.js 24，再执行：
 
 ```sh
 npm ci
-npx playwright install firefox
 npm run benchmark
 ```
 
-也可传入单个浏览器，例如 `npm run benchmark -- firefox`。如 Chrome 或 Edge 未安装在默认位置，使用 `CHROME_EXECUTABLE` 或 `EDGE_EXECUTABLE` 指向真实浏览器的可执行文件。基准校验浏览器身份，任一浏览器无法启动都会使命令失败。Firefox 使用 Playwright 提供的 Juggler 兼容 Nightly 构建，并由 Firefox 远程调试协议临时安装候选扩展。
+也可传入单个浏览器，例如 `npm run benchmark -- firefox`。浏览器未安装在默认位置时，可用 `CHROME_EXECUTABLE`、`EDGE_EXECUTABLE` 或 `FIREFOX_EXECUTABLE` 指定其可执行文件。基准校验浏览器身份，任一浏览器无法启动都会使命令失败。Firefox 使用浏览器原生 WebDriver BiDi 临时安装候选扩展并拦截固定样例，Chrome 和 Edge 使用 Playwright。
 
-每个浏览器使用新的无头浏览器配置。候选扩展的临时副本将可选 GitHub 主机权限设为已授予，性能测试从已授权状态开始。浏览器将仓库网址拦截为固定样例，阻止其他网络请求。样例在仓库主页渲染「拉取请求（PR）」标签，浏览器端使用 `performance.now()` 计时：
+每个浏览器使用新的无头浏览器配置。候选扩展的临时副本将可选 GitHub 主机权限设为已授予，性能测试从已授权状态开始。浏览器将仓库网址拦截为固定样例，阻止页面的其他网络请求。样例在仓库主页渲染「拉取请求（PR）」标签，浏览器端使用 `performance.now()` 计时：
 
 1. 首屏从带有仓库语境的控件插入文档开始，在第一轮观察到目标节点的译文写入时结束。
 2. 动态补译从 GitHub 模拟写入英文标签开始，在第一轮观察到译文写入时结束。
@@ -28,8 +27,8 @@ npm run benchmark
 
 | 浏览器 | 版本 | 首屏 P95 | 动态补译 P95 | 静置 5 秒变更 |
 | --- | --- | ---: | ---: | ---: |
-| Google Chrome | 158.0.8127.36 | 18.4 ms | 0.3 ms | 0 |
-| Microsoft Edge | 158.0.4370.33 | 30.4 ms | 0.3 ms | 0 |
-| Mozilla Firefox Nightly（Playwright 构建 1572） | 159.0 | 7 ms | 1 ms | 0 |
+| Google Chrome | 158.0.8127.36 | 18.1 ms | 0.3 ms | 0 |
+| Microsoft Edge | 158.0.4370.33 | 29.7 ms | 0.3 ms | 0 |
+| Mozilla Firefox 正式版 | 160.0.1（20261116130455） | 5 ms | 1 ms | 0 |
 
-以上为固定样例开发候选包记录。普通 Firefox 发行版、真实 GitHub 页面及各商店安装包的验收证据需单独记录。
+以上为固定样例开发候选包记录。真实 GitHub 页面及各商店安装包的验收证据单独记录。
