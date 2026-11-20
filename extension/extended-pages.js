@@ -59,9 +59,17 @@ globalThis.githubLocalizerRuntime?.register('extended-pages', () => {
     const states = {
       Success: '成功', Failure: '失败', Cancelled: '已取消', Queued: '排队中', 'In progress': '进行中',
     };
-    if (/\/actions\/runs\/\d+(?:\/|$)/.test(location.pathname.slice(repository.length))) {
+    const run = /^\/actions\/runs\/\d+(?=\/|$)/.exec(path.slice(repository.length));
+    if (run) {
       translate(document, 'main .PageHeader a[href^="/login?"]', { 'Sign in to view logs': '登录后查看日志' });
-      translate(document, 'main .PageHeader-navigation h2 > .Truncate-text', { Summary: '摘要' });
+      const summary = { Summary: '摘要' };
+      translate(document, 'main .PageHeader-navigation h2 > .Truncate-text', summary);
+      for (const label of runtime.matches('main a[data-component="NavList.Item"][aria-current="page"] [data-component="ActionList.Item.Label"]')) {
+        const link = label.closest('a');
+        if (link.origin === location.origin && link.pathname.replace(/\/$/, '') === repository + run[0]) {
+          translateText(label, summary);
+        }
+      }
       translate(document, 'main [aria-label="Workflow run summary"] span.text-small', {
         Status: '状态', 'Total duration': '总耗时', Artifacts: '构建产物',
       });
