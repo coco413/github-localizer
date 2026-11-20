@@ -30,12 +30,13 @@ export async function publishFindings(report, tracker = github) {
     if (finding.kind !== 'unlisted' && finding.kind !== 'rule-failed') continue;
     const prior = known.get(finding.key);
     if (prior) {
-      Object.assign(finding, prior);
+      finding.issue = prior.issue;
+      if (prior.firstDetectedAt < finding.firstDetectedAt) finding.firstDetectedAt = prior.firstDetectedAt;
       continue;
     }
     const title = `[巡检] ${finding.kind === 'unlisted' ? '未收录' : '规则失效'} · ${finding.control} · ${finding.original}`;
-    const lines = finding.samples.map(({ url, selector, attribute, reason, expected }) =>
-      JSON.stringify({ url, selector, attribute, reason, expected }).replaceAll('`', '\\u0060'));
+    const lines = finding.samples.map(({ url, state, selector, attribute, reason, expected }) =>
+      JSON.stringify({ url, state, selector, attribute, reason, expected }).replaceAll('`', '\\u0060'));
     const body = [
       `<!-- github-localizer-inspection:${finding.key} ${finding.firstDetectedAt} -->`,
       `词库版本 ${report.dictionaryVersion}，首次发现 ${finding.firstDetectedAt}。`,

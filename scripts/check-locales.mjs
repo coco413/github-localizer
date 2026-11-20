@@ -9,6 +9,21 @@ const placeholder = /\{\{[\w.-]+\}\}|\{[\w.-]+\}|%(?:\d+\$)?[sdif]|\$[A-Z_][A-Z_
 const inlineTag = /<\/?[a-z][\w-]*(?:\s[^<>]*?)?\s*\/?\s*>/gi;
 const errors = [];
 
+function selectorAlternatives(selector) {
+  let depth = 0;
+  let start = 0;
+  const alternatives = [];
+  for (const token of selector.matchAll(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\\.|[()[\],]/g)) {
+    if (token[0] === '(' || token[0] === '[') depth += 1;
+    if (token[0] === ')' || token[0] === ']') depth -= 1;
+    if (token[0] !== ',' || depth !== 0) continue;
+    alternatives.push(selector.slice(start, token.index).trim());
+    start = token.index + 1;
+  }
+  alternatives.push(selector.slice(start).trim());
+  return alternatives;
+}
+
 function keyOf(property) {
   if (property.type !== 'Property' || property.computed) return undefined;
   return property.key.name ?? property.key.value;
@@ -125,14 +140,16 @@ for (const file of files) {
         const key = keyOf(property);
         if (typeof key !== 'string') continue;
         const value = property.value;
-        const signature = JSON.stringify([scope, key]);
         const translation = value.type === 'ObjectExpression'
           ? JSON.stringify(modes.map(mode => entries(value).find(property => keyOf(property) === mode)?.value.value))
           : JSON.stringify(modes.map(() => value.value));
-        if (seen.has(signature) && seen.get(signature) !== translation) {
-          report(property, `rule conflict for "${key}" within ${scope}`);
+        for (const alternative of selectorAlternatives(scope)) {
+          const signature = JSON.stringify([alternative, key]);
+          if (seen.has(signature) && seen.get(signature) !== translation) {
+            report(property, `rule conflict for "${key}" within ${alternative}`);
+          }
+          seen.set(signature, translation);
         }
-        seen.set(signature, translation);
       }
     }
   });

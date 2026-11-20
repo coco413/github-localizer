@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      actions: read
       issues: write
     env:
       INSPECTION_SAMPLE_REPO: ${{ vars.INSPECTION_SAMPLE_REPO }}
@@ -41,13 +42,28 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run check:locales
+      - name: Recover inspection history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts
+          for run in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow github-inspection.yml --status completed --limit 20 --json databaseId --jq '.[].databaseId'); do
+            if gh run download "$run" --repo "$GITHUB_REPOSITORY" --name github-interface-inspection --dir artifacts; then
+              break
+            fi
+          done
       - if: github.event_name == 'schedule'
         env:
           GH_TOKEN: ${{ github.token }}
+          INSPECTION_AUTH_STATE: ${{ secrets.INSPECTION_AUTH_STATE }}
         run: npm run inspect:github -- --publish
       - if: github.event_name == 'workflow_dispatch' && !inputs.release
+        env:
+          INSPECTION_AUTH_STATE: ${{ secrets.INSPECTION_AUTH_STATE }}
         run: npm run inspect:github
       - if: github.event_name == 'workflow_dispatch' && inputs.release
+        env:
+          INSPECTION_AUTH_STATE: ${{ secrets.INSPECTION_AUTH_STATE }}
         run: npm run inspect:github -- --release
       - if: always()
         uses: actions/upload-artifact@v4

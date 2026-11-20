@@ -13,7 +13,7 @@ test('locale check locates invalid stock entries and conflicting rules', () => {
       globalThis.githubLocalizerIssuePrWords = {
         issues: [
           ['button', { Open: '打开', Open: '', 'Show <b>{count}</b>': { beginner: '显示' } }],
-          ['button', { Open: '进行中' }],
+          ['a, button', { Open: '进行中' }],
         ],
       };
     `);
@@ -39,7 +39,7 @@ test('inspection classifies fixed controls, protects content, and groups duplica
     await page.route('https://github.com/**', route => route.fulfill({
       contentType: 'text/html',
       status: route.request().url().endsWith('/missing') ? 404 : 200,
-      body: '<main><button id="new">New interface label</button><button id="old">Open</button>' +
+      body: '<main><button id="new">New interface label (beta): try it!</button><button id="old">Open</button>' +
         '<button id="kept">PR</button><div class="markdown-body"><button id="new">Private comment</button></div></main>',
     }));
     const controls = [
@@ -56,7 +56,7 @@ test('inspection classifies fixed controls, protects content, and groups duplica
     });
     equal(report.status, 'incomplete');
     equal(report.dictionaryVersion, '1.0.0+fixture');
-    equal(report.findings[0].original, 'New interface label');
+    equal(report.findings[0].original, 'New interface label (beta): try it!');
     equal(report.findings[0].pageCount, 2);
     equal(report.findings[0].samples.length, 2);
     equal(report.findings[0].firstDetectedAt, '2026-01-01T00:00:00.000Z');
@@ -65,7 +65,7 @@ test('inspection classifies fixed controls, protects content, and groups duplica
     equal(report.findings[0].storeReviewAt, null);
     equal(report.findings.some(finding => finding.original === 'Private comment'), false);
     equal(report.findings.map(finding => finding.kind).sort().join(','), 'retained,rule-failed,unavailable,unlisted');
-    equal(report.candidates[0].original, 'New interface label');
+    equal(report.candidates[0].original, 'New interface label (beta): try it!');
   } finally {
     await browser.close();
   }
@@ -110,4 +110,50 @@ test('stock translations resolve a reported finding when the live control is rea
   } finally {
     await browser.close();
   }
+});
+
+test('inspection detects missing required slots, retained drift, and punctuated candidates', async () => {
+  const { inspectPage } = await import('../scripts/inspect-github.mjs');
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.route('https://github.com/octocat/Hello-World', route => route.fulfill({
+      path: 'tests/fixtures/repository.html',
+    }));
+    const result = await inspectPage(page, {
+      url: 'https://github.com/octocat/Hello-World',
+      controls: [
+        { id: 'retained-code', selector: 'nav span[data-content="Code"]', retained: ['Code'] },
+        { id: 'missing', selector: 'nav span[data-content="Missing"]', retained: ['Missing'], timeout: 10 },
+        { id: 'partial', selector: 'nav span[data-content="Issues"]', min: 2, expected: { Issues: '议题' } },
+      ],
+    });
+    equal(result.findings.filter(({ kind }) => kind === 'rule-failed').length, 3);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('release inspection accounts for narrow, keyboard, deferred, empty, and signed-in samples', async () => {
+  const { inspectionSamples } = await import('../scripts/inspection-samples.mjs');
+  const samples = inspectionSamples({});
+  for (const state of ['narrow', 'keyboard-menu', 'deferred-menu', 'empty', 'signed-in']) {
+    equal(samples.some(sample => sample.state === state), true, state);
+  }
+  equal(samples.some(sample => sample.state === 'signed-in' && sample.incomplete), true);
+});
+
+test('report carries lifecycle history for findings that disappear and later recur', async () => {
+  const { buildReport } = await import('../scripts/inspect-github.mjs');
+  const page = { url: 'https://github.com/example/repo', findings: [
+    { kind: 'unlisted', control: 'one', original: 'New phrase' },
+  ] };
+  const first = buildReport([page], { dictionaryVersion: 'v1', observedAt: '2026-01-01' });
+  const key = first.findings[0].key;
+  const second = buildReport([], { dictionaryVersion: 'v2', observedAt: '2026-02-01',
+    history: first.lifecycle, lifecycle: { [key]: { fixPublishableAt: '2026-02-01' } } });
+  const third = buildReport([page], { dictionaryVersion: 'v3', observedAt: '2026-03-01', history: second.lifecycle });
+  equal(third.findings[0].firstDetectedAt, '2026-01-01');
+  equal(third.findings[0].fixPublishableAt, '2026-02-01');
 });

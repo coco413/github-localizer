@@ -12,25 +12,33 @@ const runtimeFiles = [
 ];
 
 export async function inspectPage(page, sample, files = runtimeFiles) {
-  const { url, controls, action } = sample;
+  const { url, controls, action, state, ready, timeout = 5_000 } = sample;
   const expectedUrl = new URL(url);
   if (expectedUrl.origin !== 'https://github.com' || expectedUrl.username || expectedUrl.password) {
     throw new Error('Inspection accepts only GitHub HTTPS pages.');
   }
   const unavailable = (reason) => ({
-    url, incomplete: true, findings: [{ kind: 'unavailable', control: 'page', original: null, reason }],
+    url, state, incomplete: true, findings: [{ kind: 'unavailable', control: state ?? 'page', original: null, reason }],
   });
   const findings = [];
   try {
+    await page.setViewportSize(sample.viewport ?? { width: 1280, height: 720 });
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     if (!response?.ok()) return unavailable(`HTTP ${response?.status() ?? 'unknown'}`);
     const actualUrl = new URL(page.url());
     if (actualUrl.origin !== expectedUrl.origin || actualUrl.pathname !== expectedUrl.pathname) {
       return unavailable('Unexpected redirect');
     }
-    if (action) await page.locator(action).first().click({ timeout: 5_000 });
-    await Promise.all(controls.map(({ selector }) => page.locator(selector).filter({ visible: true }).first()
-      .waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})));
+    if (action) {
+      const trigger = page.locator(action.selector).filter({ visible: true }).first();
+      if (action.key) await trigger.press(action.key, { timeout });
+      else await trigger.click({ timeout });
+    }
+    if (ready) {
+      await page.locator(ready).filter({ visible: true }).first().waitFor({ state: 'visible', timeout });
+    }
+    await Promise.all(controls.map(({ selector, timeout: controlTimeout = timeout }) => page.locator(selector).filter({ visible: true }).first()
+      .waitFor({ state: 'visible', timeout: controlTimeout }).catch(() => {})));
 
     // Chromium's isolated world matches content-script isolation on real pages.
     const cdp = await page.context().newCDPSession(page);
@@ -45,17 +53,20 @@ export async function inspectPage(page, sample, files = runtimeFiles) {
         return result.result.value;
       }
 
-      const read = (selector, attribute, excluded) =>
-        Array.from(document.querySelectorAll(selector)).flatMap(element => {
-          if (element.closest(excluded) || !element.getClientRects().length) return [];
+      const capture = (definitions, excluded) => {
+        const slots = definitions.map(({ selector, attribute }) =>
+          Array.from(document.querySelectorAll(selector))
+            .filter(element => !element.closest(excluded) && element.getClientRects().length)
+            .map(element => ({ element, attribute })));
+        globalThis.inspectionSnapshot = () => slots.map(entries => entries.map(({ element, attribute }) => {
+          if (!element.isConnected || element.closest(excluded) || !element.getClientRects().length) return null;
           const value = attribute ? element.getAttribute(attribute) :
             Array.from(element.childNodes).filter(node => node.nodeType === 3).map(node => node.data).join('');
-          const text = value?.trim();
-          return text ? [text] : [];
-        });
-      const snapshot = () => evaluate(`[${controls.map(({ selector, attribute = null }) =>
-        `(${read})(${JSON.stringify(selector)}, ${JSON.stringify(attribute)}, ${JSON.stringify(protectedContent)})`
-      ).join(',')}]`);
+          return value?.trim() || null;
+        }));
+      };
+      await evaluate(`(${capture})(${JSON.stringify(controls)}, ${JSON.stringify(protectedContent)})`);
+      const snapshot = () => evaluate('globalThis.inspectionSnapshot()');
       const originals = await snapshot();
       for (const file of files) await evaluate(await readFile(resolve('extension', file), 'utf8'));
       await evaluate('globalThis.githubLocalizerRuntime?.configure({ enabled: true, original: false, mode: "beginner" })');
@@ -63,17 +74,21 @@ export async function inspectPage(page, sample, files = runtimeFiles) {
       await evaluate('globalThis.githubLocalizerRuntime?.configure({ enabled: true, original: false, mode: "professional" })');
       const professional = await snapshot();
 
-      for (const [index, { id: control, selector, attribute, expected = {}, retained = [] }] of controls.entries()) {
-        if (!originals[index].length && Object.keys(expected).length) {
-          findings.push({ kind: 'rule-failed', control, selector, attribute, original: Object.keys(expected).join(' / '),
-            expected, reason: 'Control or text unavailable at its expected location' });
-          continue;
+      for (const [index, { id: control, selector, attribute, expected = {}, retained = [], min = 1 }] of controls.entries()) {
+        const labels = [...Object.keys(expected), ...retained];
+        if (originals[index].filter(Boolean).length < min && labels.length) {
+          findings.push({ kind: 'rule-failed', control, selector, attribute, original: labels.join(' / '),
+            expected, reason: 'Fewer controls or labels than expected at this location' });
         }
         for (const [slot, original] of originals[index].entries()) {
+          if (!original) continue;
           const location = { control, selector, attribute, original };
           const translated = [beginner[index][slot], professional[index][slot]];
-          if (retained.includes(original) && translated.every(value => value === original)) {
-            findings.push({ kind: 'retained', ...location });
+          if (translated.includes(null)) {
+            findings.push({ kind: 'rule-failed', ...location, reason: 'A control disappeared during translation' });
+          } else if (retained.includes(original)) {
+            if (translated.every(value => value === original)) findings.push({ kind: 'retained', ...location });
+            else findings.push({ kind: 'rule-failed', ...location, expected: original, reason: 'Retained English changed' });
           } else if (Object.hasOwn(expected, original)) {
             const target = expected[original];
             const targets = typeof target === 'string' ? [target, target] : [target.beginner, target.professional];
@@ -81,7 +96,7 @@ export async function inspectPage(page, sample, files = runtimeFiles) {
               findings.push({ kind: 'rule-failed', ...location, expected: target,
                 reason: 'Translation differs from the expected locale' });
             }
-          } else if (translated.every(value => value === original) && /^[\p{L}][\p{L} .’'?!-]{1,79}$/u.test(original) && /[A-Za-z]/.test(original)) {
+          } else if (translated.every(value => value === original) && /^[A-Za-z][A-Za-z0-9 .,’'?!:;()&/+–—…-]{1,119}$/u.test(original)) {
             findings.push({ kind: 'unlisted', ...location });
           }
         }
@@ -92,23 +107,29 @@ export async function inspectPage(page, sample, files = runtimeFiles) {
   } catch (error) {
     return unavailable(error.name === 'TimeoutError' ? 'Timed out waiting for the page or state' : 'Navigation or probe failed');
   }
-  return { url, incomplete: false, findings };
+  return { url, state, incomplete: false, findings };
 }
 
-export function buildReport(pages, { dictionaryVersion, observedAt, lifecycle = {} }) {
+export function buildReport(pages, { dictionaryVersion, observedAt, history = {}, lifecycle = {} }) {
+  const datesByKey = { ...history };
+  for (const [key, dates] of Object.entries(lifecycle)) {
+    datesByKey[key] = { ...datesByKey[key], ...dates };
+  }
   const findings = new Map();
-  for (const { url, findings: details } of pages) {
+  for (const { url, state, findings: details } of pages) {
     for (const { kind, control, original, selector, attribute, reason, expected } of details) {
       const key = createHash('sha256').update(JSON.stringify([kind, control, original])).digest('hex');
       if (!findings.has(key)) {
-        const dates = Object.hasOwn(lifecycle, key) ? lifecycle[key] : {};
+        const dates = Object.hasOwn(datesByKey, key) ? datesByKey[key] : {};
         findings.set(key, { key, kind, control, original, samples: [], firstDetectedAt: dates.firstDetectedAt ?? observedAt,
           fixPublishableAt: dates.fixPublishableAt ?? null, userInstallableAt: dates.userInstallableAt ?? null,
           storeReviewAt: dates.storeReviewAt ?? null });
       }
       const finding = findings.get(key);
-      if (!finding.samples.some(sample => sample.url === url && sample.selector === selector && sample.attribute === attribute)) {
-        finding.samples.push({ url, selector, attribute, reason, expected });
+      const { firstDetectedAt, fixPublishableAt, userInstallableAt, storeReviewAt } = finding;
+      datesByKey[key] = { firstDetectedAt, fixPublishableAt, userInstallableAt, storeReviewAt };
+      if (!finding.samples.some(sample => sample.url === url && sample.state === state && sample.selector === selector && sample.attribute === attribute)) {
+        finding.samples.push({ url, state, selector, attribute, reason, expected });
       }
     }
   }
@@ -116,9 +137,9 @@ export function buildReport(pages, { dictionaryVersion, observedAt, lifecycle = 
     ...finding, pageCount: new Set(finding.samples.map(sample => sample.url)).size,
   })).sort((left, right) => right.pageCount - left.pageCount || left.key.localeCompare(right.key));
   return {
-    dictionaryVersion, observedAt,
+    dictionaryVersion, observedAt, lifecycle: datesByKey,
     status: pages.some(page => page.incomplete) ? 'incomplete' : 'complete',
-    pages: pages.map(({ url, incomplete }) => ({ url, status: incomplete ? 'incomplete' : 'complete' })),
+    pages: pages.map(({ url, state, incomplete }) => ({ url, state, status: incomplete ? 'incomplete' : 'complete' })),
     findings: sorted,
     candidates: sorted.filter(({ kind }) => kind === 'unlisted').map(({ control, original, samples }) => ({
       control, original, samples, beginner: '', professional: '',
@@ -135,7 +156,13 @@ async function run() {
   const results = [];
   try {
     const page = await browser.newPage({ locale: 'en-US' });
-    for (const sample of samples) results.push(sample.url ? await inspectPage(page, sample) : sample);
+    const storageState = process.env.INSPECTION_AUTH_STATE
+      ? JSON.parse(process.env.INSPECTION_AUTH_STATE) : process.env.INSPECTION_AUTH_STATE_FILE;
+    const signedInPage = samples.some(sample => sample.authenticated)
+      ? await browser.newPage({ locale: 'en-US', storageState }) : null;
+    for (const sample of samples) {
+      results.push(sample.url ? await inspectPage(sample.authenticated ? signedInPage : page, sample) : sample);
+    }
   } finally {
     await browser.close();
   }
@@ -144,16 +171,25 @@ async function run() {
   for (const file of runtimeFiles) hash.update(await readFile(resolve('extension', file)));
   const lifecycle = process.env.INSPECTION_LIFECYCLE_FILE
     ? JSON.parse(await readFile(process.env.INSPECTION_LIFECYCLE_FILE, 'utf8')) : {};
+  const output = resolve('artifacts/github-inspection.json');
+  const previous = await readFile(output, 'utf8').then(JSON.parse, error => {
+    if (error.code !== 'ENOENT') throw error;
+    return {};
+  });
+  const history = previous.lifecycle ?? Object.fromEntries((previous.findings ?? []).map(finding => [finding.key, {
+    firstDetectedAt: finding.firstDetectedAt, fixPublishableAt: finding.fixPublishableAt,
+    userInstallableAt: finding.userInstallableAt, storeReviewAt: finding.storeReviewAt,
+  }]));
   const report = buildReport(results, {
-    lifecycle,
+    history, lifecycle,
     dictionaryVersion: `${version}+${hash.digest('hex').slice(0, 12)}`,
     observedAt: new Date().toISOString(),
   });
-  const output = resolve('artifacts/github-inspection.json');
   await mkdir(dirname(output), { recursive: true });
   try {
     if (process.argv.includes('--publish')) await publishFindings(report);
   } finally {
+    for (const finding of report.findings) report.lifecycle[finding.key].firstDetectedAt = finding.firstDetectedAt;
     await writeFile(output, JSON.stringify(report, null, 2) + '\n');
   }
   console.log(`${report.status}: ${report.findings.length} findings in ${output}`);
