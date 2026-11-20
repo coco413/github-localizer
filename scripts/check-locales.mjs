@@ -63,7 +63,7 @@ for (const file of files) {
   }
 
   visit(ast, node => {
-    if (node.type === 'ArrayExpression' && node.elements.length === 2) {
+    if (node.type === 'ArrayExpression' && node.elements.length >= 2 && node.elements.length <= 3) {
       const [, words] = node.elements;
       registerTable(words);
     }
@@ -132,7 +132,7 @@ for (const file of files) {
     if (node.type !== 'ArrayExpression') return;
     const seen = new Map();
     for (let rule of node.elements) {
-      if (rule?.type !== 'ArrayExpression' || rule.elements.length !== 2) continue;
+      if (rule?.type !== 'ArrayExpression' || rule.elements.length < 2 || rule.elements.length > 3) continue;
       const [selector, words] = rule.elements;
       if (!selector || !words) continue;
       const scope = String(selectorText(selector)).trim();

@@ -29,14 +29,20 @@ export async function inspectPage(page, sample, files = runtimeFiles) {
     if (actualUrl.origin !== expectedUrl.origin || actualUrl.pathname !== expectedUrl.pathname) {
       return unavailable('Unexpected redirect');
     }
+    const readyControl = ready ? page.locator(ready).filter({ visible: true }).first() : null;
     if (action) {
-      const trigger = page.locator(action.selector).filter({ visible: true }).first();
-      if (action.key) await trigger.press(action.key, { timeout });
-      else await trigger.click({ timeout });
+      let targets = page.locator(action.selector).filter({ visible: true });
+      if (action.text) targets = targets.filter({ hasText: action.text });
+      const trigger = targets.first();
+      const activate = () => action.key ? trigger.press(action.key, { timeout }) : trigger.click({ timeout });
+      await activate();
+      if (readyControl) {
+        const opened = await readyControl.waitFor({ state: 'visible', timeout: 1_500 })
+          .then(() => true, () => false);
+        if (!opened && await trigger.getAttribute('aria-expanded', { timeout }) === 'false') await activate();
+      }
     }
-    if (ready) {
-      await page.locator(ready).filter({ visible: true }).first().waitFor({ state: 'visible', timeout });
-    }
+    if (readyControl) await readyControl.waitFor({ state: 'visible', timeout });
     await Promise.all(controls.map(({ selector, timeout: controlTimeout = timeout }) => page.locator(selector).filter({ visible: true }).first()
       .waitFor({ state: 'visible', timeout: controlTimeout }).catch(() => {})));
 
