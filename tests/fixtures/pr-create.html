@@ -1,0 +1,27 @@
+<!doctype html>
+<title>Open a pull request · GitHub</title>
+<meta name="octolytics-dimension-repository_id" content="1">
+<main><div id="repo-content-pjax-container">
+  <div class="compare-pr-header Subhead">
+    <h1 class="Subhead-heading">Open a pull request</h1>
+    <button type="button" class="js-toggle-range-editor-cross-repo">compare across forks</button>
+  </div>
+  <div class="range-editor">
+    <details id="base-ref-selector">
+      <summary class="branch" role="button"><span class="Button-label"><span class="text-bold">base:</span> <span data-menu-button>Title</span></span></summary>
+      <span class="SelectMenu-title">Choose a base ref</span>
+    </details>
+    <details id="head-ref-selector">
+      <summary class="branch" role="button"><span class="Button-label"><span class="text-bold">compare:</span> <span data-menu-button>Description</span></span></summary>
+    </details>
+  </div>
+  <form id="new_pull_request" action="/octocat/Hello-World/pull-requests" method="post">
+    <label for="pull_request_title">Add a title</label>
+    <input id="pull_request_title" name="pull_request[title]" value="Create pull request" placeholder="Title">
+    <label for="pull_request_body">Add a description</label>
+    <textarea id="pull_request_body" name="pull_request[body]" placeholder="Add your description here...">Add a description</textarea>
+    <button type="submit">Create pull request</button>
+    <button type="button">Create draft pull request</button>
+  </form>
+  <div class="diff-view"><pre>Create pull request</pre><button type="button">Create draft pull request</button></div>
+</div></main>

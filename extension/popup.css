@@ -1,0 +1,22 @@
+body {
+  min-width: 12rem;
+  padding: 1rem;
+  font: 1rem system-ui, sans-serif;
+  color-scheme: light dark;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+fieldset label {
+  display: block;
+  margin-block-end: 0.5rem;
+}

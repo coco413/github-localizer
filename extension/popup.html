@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitHub 译伴</title>
+  <link rel="stylesheet" href="popup.css">
+  <script defer src="preferences.js"></script>
+  <script defer src="popup.js"></script>
+</head>
+<body>
+  <h1>GitHub 译伴</h1>
+  <p id="status" role="status"></p>
+  <button type="button" id="authorize" hidden>授权 GitHub</button>
+  <fieldset id="settings" hidden>
+    <label><input type="checkbox" id="enabled"> 界面汉化</label>
+    <label>译法档位
+      <select id="mode">
+        <option value="beginner">入门档</option>
+        <option value="professional">专业档</option>
+      </select>
+    </label>
+    <button type="button" id="original" disabled>查看原文</button>
+  </fieldset>
+</body>
+</html>

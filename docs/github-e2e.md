@@ -1,0 +1,69 @@
+# 真实 GitHub E2E
+
+## 公开页
+
+从仓库根目录运行 `npm ci`，然后分别执行：
+
+```sh
+npm run e2e:github -- chrome
+npm run e2e:github -- edge
+npm run inspect:github
+```
+
+Chrome 和 Edge 需要安装浏览器，也可通过 `E2E_BROWSER_EXECUTABLE` 指向对应的可执行文件。设置 `E2E_HEADED=1` 可观察浏览器操作。使用 Playwright Chromium 时先执行 `npx playwright install chromium`，再运行 `npm run e2e:github`。
+
+E2E 使用一次性浏览器配置和打包目录的临时副本。副本预授权 GitHub，并通过浏览器调试接口装载。脚本结束后删除临时配置及副本。浏览器重启后重新装载临时扩展，再首次打开 GitHub。脚本确认仓库页已汉化，打开原站搜索，用键盘输入查询并回车核对结果 URL，随后通过仓库导航进入 Issues 并用键盘操作作者筛选弹层。巡检覆盖更多公开页、窄屏、空列表及延迟加载菜单，结果写入 `artifacts/github-inspection.json`。
+
+## 发布验收
+
+每个发布浏览器须使用该渠道实际取得的安装包。在新浏览器配置中授权 GitHub，完全退出浏览器，重启后首次打开仓库页。打开顶栏搜索，输入 `repo:microsoft/playwright is:issue` 并回车，确认进入对应搜索结果。记录系统和浏览器版本、扩展版本、测试 URL 及首次操作结果。预授权开发包的测试证据仅用于开发验证。
+
+在专用仓库中使用专用作者和审阅账号，分别完成以下步骤。
+
+1. 作者创建分支并推送一笔无敏感数据的样例提交。浏览器中点击发起 PR、填写标题与正文、提交，并确认 PR 成功创建。核对汉化控件、原始标题正文和 Diff。
+2. 审阅者在 Diff 留下有明确改动要求的行内评论并提交审核。作者回复、推送修订并解决会话，确认审核状态及操作含义准确，评论及代码保持原文。
+3. 在样例 PR 的 Actions 中打开预设会失败的工作流，按失败状态筛选，进入运行详情，打开失败的任务并定位错误日志。检查执行状态、任务及步骤界面，以及日志原文。
+4. 核对登录前后、窄屏、键盘、默认状态、弹层、空结果和动态加载。记录每项的浏览器、扩展版本、公开页或样例链接，以及通过、失败或未完成状态。证据中省略凭据和会话数据。
+
+## 2026-11-21 开发验证记录
+
+基于 `a19eefc` 构建 1.0.0，在 macOS 27.3（26C5047e）上验证。
+
+| 浏览器 | 重启后首次打开、输入、提交搜索 | 仓库导航与作者筛选弹层 |
+| --- | --- | --- |
+| Chrome 158.0.8127.36 | 通过 | 通过 |
+| Edge 158.0.4370.33 | 通过 | 通过 |
+| Firefox 160.0.1 | 通过（WebDriver BiDi，重启后重新装载临时扩展） | 未验证 |
+
+公开巡检探测了 13 个页面与状态。作者筛选提示和 Actions 菜单中的 Success、Failure、Cancelled、Queued、In progress 存在翻译差异。报告标为未完成，因为缺少专用仓库和专用账号；首次提交 PR、处理审核和定位失败日志三项待跑。 Safari 和商店发布包测试待跑。
+
+### 自动核对专用仓库
+
+将专用账号登录后的 Playwright storage state JSON 存在仓库外，并创建以下结构的 fixture JSON，替换其中的占位值。对比使用尚无 PR 的样例分支。已有的 PR、审核评论、失败工作流和任务来自前述手动验收。所有文本都使用便于精确匹配的无敏感信息样例标记。
+
+```json
+{
+  "dedicated": true,
+  "repository": "test-owner/localizer-e2e",
+  "actor": "test-owner",
+  "baseBranch": "main",
+  "fixtureBranch": "e2e/new-pr",
+  "pull": 1,
+  "pullTitle": "E2E staged pull request",
+  "reviewText": "E2E review comment",
+  "run": 123,
+  "job": 456,
+  "logText": "E2E sample failure"
+}
+```
+
+```sh
+E2E_FIXTURE_FILE=/path/to/fixture.json E2E_SESSION_FILE=/path/to/storage-state.json \
+  npm run e2e:github -- chrome --dedicated
+```
+
+脚本核对账号和仓库路径，限制主导航到专用仓库，且仅允许只读请求。它检查新建 PR 按钮、PR 讨论标签、工作流和任务失败状态的入门档译文，以及 PR 标题、审核评论和日志原文。创建 PR、提交审核及修改会话仍由测试人员在专用仓库实际操作。如果 GitHub 页面需要被过滤的请求或日志需要人工展开，记录自动核对失败，随后补做手动验证。请勿提交 session 文件。
+
+Firefox 可使用官方浏览器的新配置复跑冷启动场景。先完成 `npm run build`，通过 `about:debugging#/runtime/this-firefox` 临时载入 `dist/firefox/manifest.json`，授权 GitHub 并完全退出。重新启动后重新装载临时扩展并授权，然后首次打开仓库页，按上文操作。临时扩展重启即移除。商店安装验收使用持久安装，重启后直接打开 GitHub。
+
+在集成版本 `b355f68` 上复跑，三端冷启动搜索及 Chrome、Edge 的键盘作者弹层结果与上表一致。词库 `1.0.0+78e3e8f2c360` 的公开巡检覆盖 13 个页面或状态，报告无公开样例发现。两条未完成记录对应缺少的专用仓库与认证配置。
