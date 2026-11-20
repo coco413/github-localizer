@@ -159,3 +159,24 @@ test('report carries lifecycle history for findings that disappear and later rec
   equal(third.findings[0].firstDetectedAt, '2026-01-01');
   equal(third.findings[0].fixPublishableAt, '2026-02-01');
 });
+
+test('inspection requires each known option even when unrelated controls meet the count', async () => {
+  const { inspectPage } = await import('../scripts/inspect-github.mjs');
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.route('https://github.com/example/repo', route => route.fulfill({
+      contentType: 'text/html', body: '<main><button>Cancelled</button><button>Skipped</button></main>',
+    }));
+    const result = await inspectPage(page, {
+      url: 'https://github.com/example/repo',
+      controls: [{ id: 'status', selector: 'main button', min: 2, required: ['Success', 'Cancelled'],
+        expected: { Success: '成功', Cancelled: '已取消' } }],
+    }, []);
+    equal(result.findings.some(finding => finding.kind === 'rule-failed' &&
+      finding.original === 'Success' && /missing/i.test(finding.reason)), true);
+  } finally {
+    await browser.close();
+  }
+});

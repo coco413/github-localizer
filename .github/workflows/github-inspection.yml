@@ -46,10 +46,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p artifacts
+          history_dir=$(mktemp -d "$RUNNER_TEMP/github-inspection-history.XXXXXX")
           for run in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow github-inspection.yml --status completed --limit 20 --json databaseId --jq '.[].databaseId'); do
-            if gh run download "$run" --repo "$GITHUB_REPOSITORY" --name github-interface-inspection --dir artifacts; then
-              break
+            if gh run download "$run" --repo "$GITHUB_REPOSITORY" --name github-interface-inspection --dir "$history_dir"; then
+              if [ -f "$history_dir/github-inspection.json" ]; then
+                echo "INSPECTION_HISTORY_FILE=$history_dir/github-inspection.json" >> "$GITHUB_ENV"
+                break
+              fi
             fi
           done
       - if: github.event_name == 'schedule'

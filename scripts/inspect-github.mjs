@@ -80,11 +80,16 @@ export async function inspectPage(page, sample, files = runtimeFiles) {
       await evaluate('globalThis.githubLocalizerRuntime?.configure({ enabled: true, original: false, mode: "professional" })');
       const professional = await snapshot();
 
-      for (const [index, { id: control, selector, attribute, expected = {}, retained = [], min = 1 }] of controls.entries()) {
+      for (const [index, { id: control, selector, attribute, expected = {}, retained = [], min = 1, required = [] }] of controls.entries()) {
         const labels = [...Object.keys(expected), ...retained];
         if (originals[index].filter(Boolean).length < min && labels.length) {
           findings.push({ kind: 'rule-failed', control, selector, attribute, original: labels.join(' / '),
             expected, reason: 'Fewer controls or labels than expected at this location' });
+        }
+        for (const original of required) {
+          if (originals[index].includes(original)) continue;
+          findings.push({ kind: 'rule-failed', control, selector, attribute, original,
+            expected: expected[original] ?? original, reason: 'Required label missing at this location' });
         }
         for (const [slot, original] of originals[index].entries()) {
           if (!original) continue;
@@ -189,7 +194,8 @@ async function run() {
   const lifecycle = process.env.INSPECTION_LIFECYCLE_FILE
     ? JSON.parse(await readFile(process.env.INSPECTION_LIFECYCLE_FILE, 'utf8')) : {};
   const output = resolve('artifacts/github-inspection.json');
-  const previous = await readFile(output, 'utf8').then(JSON.parse, error => {
+  const historyPath = process.env.INSPECTION_HISTORY_FILE ?? output;
+  const previous = await readFile(historyPath, 'utf8').then(JSON.parse, error => {
     if (error.code !== 'ENOENT') throw error;
     return {};
   });
