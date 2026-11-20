@@ -137,15 +137,33 @@ test('popup settings update two tabs and preserve the current page when viewing 
   await second.evaluate(() => {
     document.body.insertAdjacentHTML('beforeend',
       '<details open><summary>Draft</summary><textarea></textarea></details><div style="height:2000px"></div>');
+    // Mimic the change in line height that font fallback can introduce when
+    // the translated controls above the draft switch back to English.
+    document.body.insertAdjacentHTML('afterbegin', '<div id="layout-shift"></div>');
+    document.head.insertAdjacentHTML('beforeend', `<style>
+      #layout-shift { height: 7px; }
+      body:has(input[placeholder="Search pull requests"]) #layout-shift { height: 0; }
+    </style>`);
     document.querySelector('textarea').value = 'Unsent GitHub draft';
-    window.scrollTo(0, 100);
+    document.querySelector('details').scrollIntoView();
   });
 
+  const draftPosition = () => second.locator('details').evaluate(async (draft) => {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return draft.getBoundingClientRect().top;
+  });
+  const initialDraftPosition = await draftPosition();
+  assert.ok(Math.abs(initialDraftPosition) < 1, 'the draft is at the top of the viewport');
+  const assertDraftPosition = async () => {
+    assert.ok(Math.abs(await draftPosition() - initialDraftPosition) < 1,
+      'the draft stays at the same position in the viewport');
+  };
   await showPopupFor(popup, second);
   const mode = popup.getByRole('combobox', { name: '译法档位' });
   await mode.selectOption('professional');
   await page.getByRole('link', { name: 'PR', exact: true }).waitFor();
   await professional.waitFor();
+  await assertDraftPosition();
 
   await popup.getByRole('button', { name: '查看原文' }).click();
   await english.waitFor();
@@ -157,8 +175,8 @@ test('popup settings update two tabs and preserve the current page when viewing 
   assert.deepEqual(await second.evaluate(() => ({
     draft: document.querySelector('textarea').value,
     open: document.querySelector('details').open,
-    scroll: window.scrollY,
-  })), { draft: 'Unsent GitHub draft', open: true, scroll: 100 });
+  })), { draft: 'Unsent GitHub draft', open: true });
+  await assertDraftPosition();
 
   const toggle = popup.getByRole('checkbox', { name: '界面汉化' });
   await toggle.uncheck();
