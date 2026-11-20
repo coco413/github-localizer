@@ -36,6 +36,17 @@ export async function dedicatedConfig(env) {
   return { fixture, cookies: session.cookies.filter(cookie => ['.github.com', 'github.com'].includes(cookie.domain)) };
 }
 
+export async function verifyPullCreation(page) {
+  await page.locator('main #new_pull_request')
+    .getByRole('button', { name: '创建拉取请求（PR）', exact: true }).waitFor();
+}
+
+export async function verifyFailedJob(page, logText) {
+  await page.locator('main #logs .js-checks-log-toolbar .CheckRun-log-title > .js-updatable-content')
+    .filter({ hasText: /^失败(?:\s|$)/ }).waitFor();
+  await page.locator('main #logs .js-job-log').getByText(logText, { exact: true }).first().waitFor();
+}
+
 export async function verifyDedicated(browser, page, { fixture, cookies }, scenario) {
   const repository = new URL(`https://github.com/${fixture.repository}`);
   const basePath = repository.pathname.toLowerCase();
@@ -69,11 +80,13 @@ export async function verifyDedicated(browser, page, { fixture, cookies }, scena
     const base = encodeURIComponent(fixture.baseBranch);
     const head = encodeURIComponent(fixture.fixtureBranch);
     await open(`/compare/${base}...${head}?expand=1`);
-    await page.locator('main').getByRole('button', { name: /^(Create pull request|创建拉取请求(?:（PR）)?)$/i }).waitFor();
+    await verifyPullCreation(page);
   });
 
   await scenario('dedicated PR preserves its title and review comment', async () => {
     await open(`/pull/${fixture.pull}`);
+    await page.getByRole('navigation', { name: '拉取请求（PR）标签页' })
+      .getByRole('link', { name: /^讨论(?:\s|$)/ }).waitFor();
     await page.locator('main').getByText(fixture.pullTitle, { exact: true }).first().waitFor();
     await page.locator('main').getByText(fixture.reviewText, { exact: true }).first().waitFor();
   });
@@ -82,10 +95,12 @@ export async function verifyDedicated(browser, page, { fixture, cookies }, scena
     const runPath = `/actions/runs/${fixture.run}`;
     const jobPath = `${runPath}/job/${fixture.job}`;
     await open(runPath);
+    await page.locator('main [aria-label="Workflow run summary"] span.h4')
+      .filter({ hasText: /^失败$/ }).waitFor();
     await Promise.all([
       page.waitForURL(url => isFixturePage(url) && url.pathname.endsWith(jobPath)),
       page.locator(`main a[href$="${jobPath}"]`).filter({ visible: true }).first().click(),
     ]);
-    await page.locator('main').getByText(fixture.logText, { exact: true }).first().waitFor();
+    await verifyFailedJob(page, fixture.logText);
   });
 }
