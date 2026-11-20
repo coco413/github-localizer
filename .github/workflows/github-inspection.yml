@@ -47,14 +47,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           history_dir=$(mktemp -d "$RUNNER_TEMP/github-inspection-history.XXXXXX")
-          for run in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow github-inspection.yml --status completed --limit 20 --json databaseId --jq '.[].databaseId'); do
+          run_ids=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow github-inspection.yml --status completed --limit 20 --json databaseId --jq '.[].databaseId') || {
+            status=$?
+            echo 'Could not list previous inspection runs.' >&2
+            exit "$status"
+          }
+          while IFS= read -r run; do
+            [ -n "$run" ] || continue
             if gh run download "$run" --repo "$GITHUB_REPOSITORY" --name github-interface-inspection --dir "$history_dir"; then
               if [ -f "$history_dir/github-inspection.json" ]; then
                 echo "INSPECTION_HISTORY_FILE=$history_dir/github-inspection.json" >> "$GITHUB_ENV"
                 break
               fi
             fi
-          done
+          done <<< "$run_ids"
       - if: github.event_name == 'schedule'
         env:
           GH_TOKEN: ${{ github.token }}

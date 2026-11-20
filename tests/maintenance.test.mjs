@@ -1,6 +1,6 @@
 import { equal, match } from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -178,5 +178,47 @@ test('inspection requires each known option even when unrelated controls meet th
       finding.original === 'Success' && /missing/i.test(finding.reason)), true);
   } finally {
     await browser.close();
+  }
+});
+
+test('inspection workflow distinguishes failed history lookup from empty or expired history', () => {
+  const workflow = readFileSync('.github/workflows/github-inspection.yml', 'utf8');
+  const recovery = workflow.match(/- name: Recover inspection history\n[\s\S]*?run: \|\n((?: {10}[^\n]*\n)+)/)[1];
+  const gh = `
+    gh() {
+      if [ "$2" = list ]; then
+        case "$HISTORY_TEST_MODE" in
+          error) return 42 ;;
+          empty) return 0 ;;
+          expired) printf '12\\n' ;;
+          recovered) printf '12\\n13\\n' ;;
+        esac
+        return 0
+      fi
+      if [ "$3" = 12 ]; then return 1; fi
+      for download_directory; do :; done
+      printf '%s\\n' '{"lifecycle":{}}' > "$download_directory/github-inspection.json"
+    }
+  `;
+  const directory = mkdtempSync(join(tmpdir(), 'github-localizer-history-'));
+  const environmentFile = join(directory, 'env');
+  try {
+    for (const [mode, status] of [['error', 42], ['empty', 0], ['expired', 0], ['recovered', 0]]) {
+      writeFileSync(environmentFile, '');
+      const result = spawnSync('bash', ['-e', '-c', gh + recovery], {
+        cwd: directory,
+        encoding: 'utf8',
+        env: { ...process.env, GITHUB_REPOSITORY: 'coco413/github-localizer', GITHUB_ENV: environmentFile,
+          RUNNER_TEMP: directory, HISTORY_TEST_MODE: mode },
+      });
+      equal(result.status, status, mode);
+      const environment = readFileSync(environmentFile, 'utf8');
+      if (mode === 'recovered') {
+        const historyPath = environment.match(/^INSPECTION_HISTORY_FILE=(.+)\n$/)[1];
+        equal(readFileSync(historyPath, 'utf8').trim(), '{"lifecycle":{}}');
+      } else equal(environment, '', mode);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
