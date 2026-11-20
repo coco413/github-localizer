@@ -37,16 +37,15 @@
       changedKeys.add(key);
       updated[key] = changes[key].newValue ?? defaults[key];
     }
-    if (!Object.keys(updated).length) return;
+    if (changes.githubSiteGranted) {
+      authorizationRevision++;
+      authorized = changes.githubSiteGranted.newValue === true;
+    } else if (!Object.keys(updated).length) return;
     apply(updated);
   });
 
   api.runtime.onMessage.addListener((message, sender, respond) => {
-    if (message.type === 'authorization-changed') {
-      authorizationRevision++;
-      authorized = message.granted;
-      apply({});
-    } else if (message.type === 'page-state' || message.type === 'toggle-original') {
+    if (message.type === 'page-state' || message.type === 'toggle-original') {
       const state = runtime.getState();
       if (message.type === 'toggle-original' && state.enabled && (!message.shortcut || !editable())) {
         runtime.configure({ original: !state.original });

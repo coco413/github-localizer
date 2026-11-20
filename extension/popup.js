@@ -9,14 +9,24 @@ const mode = document.querySelector('#mode');
 const original = document.querySelector('#original');
 const activeTab = api.tabs.query({ active: true, currentWindow: true }).then(([tab]) => tab);
 let refreshRevision = 0;
+let repositoryCheck;
 
-function supportedPage(url) {
-  if (!url) return false;
-  const { origin, pathname } = new URL(url);
+async function supportedPage(tab) {
+  if (!tab?.url) return false;
+  const { origin, pathname } = new URL(tab.url);
   if (origin !== 'https://github.com') return false;
   const route = /^\/([^/]+)\/[^/]+(?:\/(?:issues(?:\/\d+)?|pulls|pull\/\d+(?:\/(?:files|commits|checks))?|actions(?:\/.*)?|releases(?:\/.*)?|milestones(?:\/.*)?))?\/?$/.exec(pathname);
-  return Boolean(route && !['settings', 'orgs', 'users', 'marketplace', 'topics', 'collections', 'sponsors',
-    'features', 'notifications', 'account', 'search', 'explore', 'apps'].includes(route[1].toLowerCase()));
+  if (!route || ['login', 'settings', 'orgs', 'users', 'marketplace', 'topics', 'collections', 'sponsors',
+    'features', 'notifications', 'account', 'search', 'explore', 'apps'].includes(route[1].toLowerCase())) return false;
+  if (!repositoryCheck) {
+    // Chromium can queue an injection while site access is withheld.
+    const probe = api.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => Boolean(document.querySelector('meta[name="octolytics-dimension-repository_id"][content]')?.content),
+    }).then(([check]) => check?.result === true, () => true);
+    repositoryCheck = Promise.race([probe, new Promise((resolve) => setTimeout(resolve, 300, true))]);
+  }
+  return repositoryCheck;
 }
 
 async function refresh() {
@@ -26,7 +36,7 @@ async function refresh() {
     api.permissions.contains(sitePermission),
     api.storage.local.get(defaults),
   ]);
-  const supported = supportedPage(tab?.url);
+  const supported = await supportedPage(tab);
   const page = supported && granted && preferences.enabled
     ? await api.tabs.sendMessage(tab.id, { type: 'page-state' }).catch(() => null)
     : null;

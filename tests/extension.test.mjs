@@ -10,6 +10,8 @@ const repositoryFixture = await readFile(new URL('./fixtures/repository.html', i
 const prFixture = await readFile(new URL('./fixtures/pr-list.html', import.meta.url), 'utf8');
 const milestoneFixture = await readFile(new URL('./fixtures/milestones.html', import.meta.url), 'utf8');
 const fixtures = new Map([
+  ['https://github.com/login/device', '<title>Device activation</title>'],
+  ['https://github.com/community/discussions', '<title>Community discussions</title>'],
   [`${repository}/pulls`, prFixture],
   [`${repository}/milestones`, milestoneFixture],
 ]);
@@ -182,6 +184,17 @@ test('popup settings update two tabs and preserve the current page when viewing 
   await beginner.waitFor();
 });
 
+test('the popup rejects GitHub routes without repository metadata', { timeout: 15_000 }, async (t) => {
+  const { context, directory } = await openBrowser(t);
+  const popup = await loadCandidate(context, await createGrantedCandidate(directory));
+  const page = await context.newPage();
+  for (const path of ['/login/device', '/community/discussions']) {
+    await page.goto('https://github.com' + path);
+    await showPopupFor(popup, page);
+    await popup.getByText('不支持', { exact: true }).waitFor();
+  }
+});
+
 test('revocation restores the page immediately and renewed authorization applies saved settings', { timeout: 15_000 }, async (t) => {
   const { context, directory } = await openBrowser(t);
   // A popup opened as a tab cannot receive activeTab. Expose the active URL to
@@ -200,6 +213,15 @@ test('revocation restores the page immediately and renewed authorization applies
   const setSiteAccess = (hostAccess) => settings.evaluate(({ extensionId, hostAccess }) => (
     chrome.developerPrivate.updateExtensionConfiguration({ extensionId, hostAccess })
   ), { extensionId: id, hostAccess });
+  const worker = context.serviceWorkers()[0];
+  await worker.evaluate(() => {
+    const sendMessage = chrome.tabs.sendMessage.bind(chrome.tabs);
+    chrome.tabs.sendMessage = (tabId, message) => (
+      message.type === 'authorization-changed'
+        ? Promise.reject(new Error('Site messaging unavailable after revocation'))
+        : sendMessage(tabId, message)
+    );
+  });
   await setSiteAccess('ON_CLICK');
   await popup.getByText('未授权', { exact: true }).waitFor();
   await page.getByRole('link', { name: 'Pull requests' }).waitFor();

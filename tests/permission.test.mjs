@@ -44,7 +44,7 @@ test('approving the popup request enables translation on already open GitHub tab
       },
     },
     commands: { onCommand: extensionEvent() },
-    storage: { onChanged: extensionEvent(), local: { get: async (values) => values } },
+    storage: { onChanged: extensionEvent(), local: { get: async (values) => values, set: async () => {} } },
     permissions: {
       async contains() {
         return authorized;
@@ -66,6 +66,7 @@ test('approving the popup request enables translation on already open GitHub tab
         calls.push(['register', registration.matches[0], ...registration.js]);
       },
       async executeScript(script) {
+        if (script.func) return [{ result: true }];
         calls.push(['execute', script.target.tabId, ...script.files]);
       },
     },
@@ -83,6 +84,7 @@ test('approving the popup request enables translation on already open GitHub tab
   runInNewContext(backgroundScript, { chrome });
   const popupContext = {
     URL,
+    setTimeout,
     chrome,
     document: { querySelector: (selector) => ({ '#status': status, '#authorize': button })[selector] ?? control },
   };

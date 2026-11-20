@@ -12,12 +12,9 @@ let pending = Promise.resolve();
 function reconcileAuthorization(translateOpenTabs = false) {
   pending = pending.then(async () => {
     const granted = await api.permissions.contains({ origins: [site] });
-    if (!granted || translateOpenTabs) {
-      const tabs = await api.tabs.query(granted ? { url: site } : {});
-      // A revoked host grant can prevent delivery. Reloading then restores the page.
-      await Promise.allSettled(tabs.map(({ id }) =>
-        api.tabs.sendMessage(id, { type: 'authorization-changed', granted })));
-    }
+    // Storage changes still reach existing content scripts when a revoked
+    // host grant prevents direct tab messaging.
+    await api.storage.local.set({ githubSiteGranted: granted });
     const filters = { ids: [repositoryScript.id] };
     const [registered] = await api.scripting.getRegisteredContentScripts(filters);
     if (!granted) {
