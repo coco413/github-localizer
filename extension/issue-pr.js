@@ -21,12 +21,14 @@ globalThis.githubLocalizerRuntime?.register('issue-pr', () => {
     if (!time.closest(protectedContent)) runtime.replace(time, 'lang', 'zh-CN');
   }
 
-  for (const [selector, words, { icon = false } = {}] of rules) {
+  for (const [selector, words, { icon, accepts } = {}] of rules) {
     const elements = runtime.matches(selector);
     for (const element of elements) {
       if (!element.closest(scope) || element.closest(protectedContent)) continue;
+      if (accepts && !accepts(element)) continue;
       const labels = icon ? Array.from(element.childNodes).filter((node) => {
-        if (node instanceof Element && node.matches('svg[aria-hidden="true"]')) return false;
+        if (node instanceof Element && node.matches('svg') &&
+          (node.getAttribute('aria-hidden') === 'true' || node.getAttribute('aria-label') === icon)) return false;
         return node.nodeType !== Node.TEXT_NODE || node.data.trim() !== '';
       }) : element.childNodes;
       const [text] = labels;
