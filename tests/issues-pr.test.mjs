@@ -46,7 +46,7 @@ async function openFixture(t, path, fixture) {
 test('Issues list localizes the issue filter and preserves its query', async (t) => {
   const page = await openFixture(t, '/issues', 'issues-list');
   const issue = page.getByRole('link', { name: '新建议题', exact: true });
-  assert.equal(await issue.getAttribute('href'), '/login?return_to=https%3A%2F%2Fgithub.com%2Foctocat%2FHello-World%2Fissues%2Fnew');
+  assert.equal(await issue.getAttribute('href'), '/login?return_to=https://github.com/octocat/Hello-World/issues');
   await page.getByRole('link', { name: 'New issue', exact: true }).waitFor();
   const search = page.getByRole('searchbox', { name: '搜索议题', exact: true });
   await search.waitFor();
@@ -76,6 +76,7 @@ test('Issue detail localizes state and deletion controls while preserving user c
   const state = page.getByTestId('header-state');
   await page.getByText('未关闭', { exact: true }).waitFor();
   assert.equal(await state.locator('svg circle').getAttribute('r'), '5');
+  assert.equal(await state.locator('svg').getAttribute('aria-label'), 'Issue');
   const dialog = page.getByRole('dialog', { name: '删除议题', exact: true });
   await dialog.getByText('删除此议题后将无法恢复。', { exact: true }).waitFor();
   await dialog.getByRole('button', { name: '删除此议题', exact: true }).waitFor();
@@ -109,6 +110,7 @@ test('PR detail localizes review and merge controls while preserving the title, 
   const state = page.getByText('已合并', { exact: true });
   await state.waitFor();
   assert.equal(await state.locator('svg path').getAttribute('d'), 'M1 1h4');
+  assert.equal(await state.locator('svg').getAttribute('aria-label'), 'Pull request');
   const tabs = page.getByRole('navigation', { name: '拉取请求（PR）标签页', exact: true });
   await tabs.getByRole('link', { name: '变更文件', exact: true }).waitFor();
   const review = page.getByRole('dialog', { name: '审核更改', exact: true });
