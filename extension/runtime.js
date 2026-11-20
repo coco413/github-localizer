@@ -5,7 +5,11 @@
   const owned = new Map();
   const options = {
     subtree: true, childList: true, characterData: true, attributes: true,
-    attributeFilter: ['aria-label', 'placeholder', 'title', 'lang', 'datetime', 'href', 'data-content', 'role', 'data-testid'],
+    attributeFilter: [
+      'aria-label', 'placeholder', 'title', 'lang', 'datetime', 'href', 'role',
+      'class', 'id', 'contenteditable', 'type', 'for', 'app-name',
+      'data-content', 'data-testid', 'data-component',
+    ],
   };
   let state = { enabled: true, mode: 'beginner', original: false };
   const currentRoute = () => location.pathname + location.search;
@@ -15,6 +19,8 @@
   let pending = [];
   let scheduled = false;
   let refresh = false;
+  let checked;
+  let fullScan = false;
 
   function read(node, attribute) {
     return attribute ? node.getAttribute(attribute) : node.data;
@@ -26,12 +32,22 @@
     else node.setAttribute(attribute, value);
   }
 
+  function source(node, attribute) {
+    const current = read(node, attribute);
+    const binding = owned.get(node)?.get(attribute);
+    return binding && binding.value === current ? binding.source : current;
+  }
+
   function replace(node, attribute, value) {
-    const source = read(node, attribute);
-    if (source === value) return;
-    if (!owned.has(node)) owned.set(node, new Map());
-    owned.get(node).set(attribute, { source, value });
-    write(node, attribute, value);
+    const original = source(node, attribute);
+    let binding = owned.get(node)?.get(attribute);
+    if (read(node, attribute) !== value) {
+      if (!owned.has(node)) owned.set(node, new Map());
+      binding = { source: original, value };
+      owned.get(node).set(attribute, binding);
+      write(node, attribute, value);
+    }
+    if (binding) checked.add(binding);
   }
 
   function restore(node, values) {
@@ -42,7 +58,7 @@
   }
 
   function matches(selector, scope = document) {
-    if (!roots) return scope.querySelectorAll(selector);
+    if (fullScan) return scope.querySelectorAll(selector);
     const result = new Set();
     for (const root of roots) {
       if (!root.isConnected) continue;
@@ -57,6 +73,21 @@
       if (element !== scope && scope.contains(element) && element.matches(selector)) result.add(element);
     }
     return result;
+  }
+
+  function affected(node) {
+    const element = node instanceof Element ? node : node.parentElement;
+    if (parents.has(element)) return true;
+    for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+      if (roots.has(ancestor)) return true;
+    }
+    return false;
+  }
+
+  function recheckScope(scope) {
+    const changed = affected(scope);
+    if (changed) roots.add(scope);
+    return fullScan || changed;
   }
 
   function enroll(records) {
@@ -88,25 +119,38 @@
     const navigated = nextRoute !== route;
     const nextState = { ...state, ...(navigated && { original: false }), ...settings };
     const reset = navigated || Object.keys(state).some((key) => state[key] !== nextState[key]);
-    const full = refresh || reset;
+    fullScan = refresh || reset;
     refresh = false;
-    if (!full && !records.length) return;
+    if (!fullScan && !records.length) return;
 
     // Mutation records from GitHub supersede recorded originals, even when a
     // component explicitly writes the same display value the extension wrote.
     enroll(records);
     observer.disconnect();
+    checked = new Set();
     try {
       route = nextRoute;
       state = nextState;
       for (const [node, values] of owned) {
         if (reset || !node.isConnected) restore(node, values);
       }
-      if (full) roots = null;
       if (state.enabled && !state.original) {
         for (const translate of translators.values()) translate();
+        if (!reset && records.length) {
+          for (const [node, bindings] of owned) {
+            if (!affected(node)) continue;
+            for (const [attribute, binding] of bindings) {
+              if (checked.has(binding)) continue;
+              if (read(node, attribute) === binding.value) write(node, attribute, binding.source);
+              bindings.delete(attribute);
+            }
+            if (!bindings.size) owned.delete(node);
+          }
+        }
       }
     } finally {
+      fullScan = false;
+      checked = null;
       roots = null;
       parents = null;
       observer.observe(document, options);
@@ -142,6 +186,8 @@
       return { ...state };
     },
     matches,
+    recheckScope,
+    source,
     replace,
     word(value) {
       return typeof value === 'string' ? value : value[state.mode];

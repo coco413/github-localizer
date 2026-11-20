@@ -27,12 +27,15 @@ globalThis.githubLocalizerRuntime?.register('issue-pr', () => {
       if (!element.closest(scope) || element.closest(protectedContent)) continue;
       const text = element.firstChild;
       if (element.childNodes.length === 1 && text.nodeType === Node.TEXT_NODE) {
-        const source = text.data.trim();
-        if (Object.hasOwn(words, source)) runtime.replace(text, null, text.data.replace(source, () => runtime.word(words[source])));
+        const original = runtime.source(text, null);
+        const source = original.trim();
+        if (Object.hasOwn(words, source)) {
+          runtime.replace(text, null, original.replace(source, () => runtime.word(words[source])));
+        }
       }
 
       for (const attribute of ['aria-label', 'placeholder', 'title']) {
-        const label = element.getAttribute(attribute);
+        const label = runtime.source(element, attribute);
         if (Object.hasOwn(words, label)) runtime.replace(element, attribute, runtime.word(words[label]));
       }
     }

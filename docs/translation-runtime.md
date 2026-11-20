@@ -3,6 +3,8 @@
 授权后在 GitHub 页面注入 `runtime.js`，页面规则随后通过
 `githubLocalizerRuntime.register(name, translate)` 注册。回调按当前路径选择规则，
 通过 `matches(selector, scope)` 查找完整页面或本次受影响的区域，通过
+`source(node, attribute)` 读取当前原文。依赖整个容器上下文的规则可用
+`recheckScope(scope)` 在容器受影响时重新验证其内所有控件。通过
 `replace(node, attribute, value)` 应用、记录并恢复可安全改动的值。传入
 `null` 属性名时改动文本节点本身。
 

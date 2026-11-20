@@ -10,8 +10,11 @@ globalThis.githubLocalizerRuntime?.register('extended-pages', () => {
     if (element.closest('.markdown-body, pre, code, [contenteditable], .js-job-log')) return;
     for (const text of element.childNodes) {
       if (text.nodeType !== Node.TEXT_NODE) continue;
-      const source = text.data.trim();
-      if (Object.hasOwn(words, source)) runtime.replace(text, null, text.data.replace(source, () => runtime.word(words[source])));
+      const original = runtime.source(text, null);
+      const source = original.trim();
+      if (Object.hasOwn(words, source)) {
+        runtime.replace(text, null, original.replace(source, () => runtime.word(words[source])));
+      }
     }
   }
 
@@ -43,7 +46,7 @@ globalThis.githubLocalizerRuntime?.register('extended-pages', () => {
       'Unstar this repository': '移除此仓库的星标',
     };
     for (const button of runtime.matches('[data-testid="repo-header-actions"] [aria-label]', home)) {
-      const source = button.getAttribute('aria-label');
+      const source = runtime.source(button, 'aria-label');
       if (Object.hasOwn(labels, source)) runtime.replace(button, 'aria-label', runtime.word(labels[source]));
     }
     translate(home, '[class*="sidebarSection__"] > h2 > span', {

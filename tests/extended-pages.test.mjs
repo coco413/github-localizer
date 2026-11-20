@@ -3,6 +3,7 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const repository = 'https://github.com/octocat/Hello-World';
@@ -132,25 +133,25 @@ test('site navigation restores old controls, then translates newly mounted contr
   assert.equal(await open.getAttribute('href'), '/octocat/Hello-World/milestones');
 });
 
-test('workflow timestamps refresh in the component locale without modifying workflow logs', { timeout: 12_000 }, async (t) => {
+test('GitHub timestamps refresh in Chinese and restore the inherited locale on navigation', { timeout: 12_000 }, async (t) => {
   const page = await openFixture(t, '/actions', 'actions');
-  await page.getByRole('heading', { name: '所有工作流', exact: true }).waitFor({ timeout: 3_000 });
+  await page.clock.install({ time: new Date('2025-01-01T00:01:00Z') });
+  const bundle = new URL('bundle.js', import.meta.resolve('@github/relative-time-element'));
+  await page.addScriptTag({ path: fileURLToPath(bundle), type: 'module' });
   await page.evaluate(() => {
-    customElements.define('relative-time', class extends HTMLElement {
-      static observedAttributes = ['lang', 'datetime'];
-      attributeChangedCallback() {
-        const minutes = Number(this.getAttribute('datetime').slice(14, 16));
-        this.textContent = new Intl.RelativeTimeFormat(this.lang || 'en').format(-minutes, 'minute');
-      }
-    });
-    const markup = '<relative-time datetime="2025-01-01T00:01:00Z"></relative-time>';
+    const markup = '<relative-time datetime="2025-01-01T00:00:00Z" format="relative" format-style="long" no-title></relative-time>';
     document.querySelector('main').insertAdjacentHTML('beforeend', markup);
     document.querySelector('pre').insertAdjacentHTML('beforeend', markup);
   });
-  await page.getByText('1分钟前', { exact: true }).waitFor({ timeout: 3_000 });
-  await page.locator('main > relative-time').evaluate((time) => time.setAttribute('datetime', '2025-01-01T00:03:00Z'));
-  await page.getByText('3分钟前', { exact: true }).waitFor({ timeout: 3_000 });
-  assert.equal(await page.locator('pre relative-time').textContent(), '1 minute ago');
+  await page.locator('main > relative-time').getByText('1分钟前', { exact: true }).waitFor({ timeout: 3_000 });
+  await page.clock.runFor(120_000);
+  const time = page.locator('main > relative-time');
+  await time.getByText('3分钟前', { exact: true }).waitFor({ timeout: 3_000 });
+  assert.equal(await time.getAttribute('datetime'), '2025-01-01T00:00:00Z');
+  await page.locator('pre relative-time').getByText('3 minutes ago', { exact: true }).waitFor({ timeout: 3_000 });
+  await page.evaluate(() => history.pushState({}, '', '/octocat/Hello-World/tree/main'));
+  await time.getByText('3 minutes ago', { exact: true }).waitFor({ timeout: 3_000 });
+  assert.equal(await time.getAttribute('lang'), null);
 });
 
 test('pausing before and after a count update preserves the latest source and clickable link', { timeout: 15_000 }, async (t) => {
@@ -216,4 +217,42 @@ test('unrecognized label updates stay in English and an idle page gets no extra 
   });
   await page.getByRole('button', { name: 'Workflow filter', exact: true }).waitFor({ timeout: 3_000 });
   assert.equal(writes, 0);
+});
+
+test('changing a translated workflow navigation link to a custom workflow restores its name', { timeout: 12_000 }, async (t) => {
+  const page = await openFixture(t, '/actions', 'actions');
+  const builtIn = page.getByRole('link', { name: '所有工作流', exact: true });
+  await builtIn.waitFor({ timeout: 3_000 });
+  await builtIn.evaluate((link) => { link.href = '/octocat/Hello-World/actions/workflows/custom.yml'; });
+  const custom = page.locator('a[href$="/custom.yml"]');
+  await custom.getByText('All workflows', { exact: true }).waitFor({ timeout: 3_000 });
+});
+
+test('moving a translated control into workflow logs restores the protected text', { timeout: 12_000 }, async (t) => {
+  const page = await openFixture(t, '/actions', 'actions');
+  const filter = page.getByRole('button', { name: '工作流', exact: true });
+  await filter.waitFor({ timeout: 3_000 });
+  await filter.evaluate((button) => document.querySelector('pre').append(button));
+  await page.locator('pre').getByRole('button', { name: 'Workflow', exact: true }).waitFor({ timeout: 3_000 });
+});
+
+test('repository navigation is restored when its Code tab no longer identifies the repository', { timeout: 12_000 }, async (t) => {
+  const page = await openFixture(t, '', 'repository');
+  const code = page.getByRole('link', { name: '代码', exact: true });
+  await code.waitFor({ timeout: 3_000 });
+  const issues = page.locator('nav a[href$="/issues"]');
+  await issues.getByText('议题', { exact: true }).waitFor({ timeout: 3_000 });
+  await code.evaluate((link) => { link.href = '/octocat/Hello-World/tree/main'; });
+  await issues.getByText('Issues', { exact: true }).waitFor({ timeout: 3_000 });
+});
+
+test('a protection class added to an existing container restores its controls', { timeout: 12_000 }, async (t) => {
+  const page = await openFixture(t, '/actions', 'actions');
+  const toolbar = page.getByRole('toolbar', { name: 'Workflow run filters' });
+  const translated = toolbar.getByRole('button', { name: '工作流', exact: true });
+  await translated.waitFor({ timeout: 3_000 });
+  await toolbar.evaluate((element) => element.classList.add('js-job-log'));
+  await toolbar.getByRole('button', { name: 'Workflow', exact: true }).waitFor({ timeout: 3_000 });
+  await toolbar.evaluate((element) => element.classList.remove('js-job-log'));
+  await translated.waitFor({ timeout: 3_000 });
 });

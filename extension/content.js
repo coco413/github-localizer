@@ -6,7 +6,9 @@ globalThis.githubLocalizerRuntime?.register('repository-navigation', () => {
   const navigation = document.querySelector(
     'nav[aria-label="Repository"], nav[aria-label="Repository navigation"]',
   );
-  if (!navigation) return;
+  if (!navigation || !runtime.recheckScope(navigation)) return;
+  const protectedContent = '.markdown-body, [contenteditable], pre, code';
+  if (navigation.closest(protectedContent)) return;
   const links = Array.from(navigation.querySelectorAll('a[href]')).filter(
     (link) => link.origin === location.origin,
   );
@@ -16,15 +18,15 @@ globalThis.githubLocalizerRuntime?.register('repository-navigation', () => {
   if (!codeTab) return;
 
   for (const [suffix, entries] of Object.entries(globalThis.githubLocalizerRepositoryWords)) {
-    for (const link of runtime.matches('a[href]', navigation)) {
-      if (link.origin !== location.origin) continue;
+    for (const link of links) {
       if (link.pathname.replace(/\/$/, '') !== homePath + suffix) continue;
       for (const [source, translation] of Object.entries(entries)) {
         const label = link.querySelector(`span[data-content="${source}"]`);
+        if (label?.closest(protectedContent)) continue;
         const text = label?.firstChild;
-        if (label?.childNodes.length === 1 && text.nodeType === Node.TEXT_NODE && text.data === source) {
+        if (label?.childNodes.length === 1 && text.nodeType === Node.TEXT_NODE && runtime.source(text, null) === source) {
           runtime.replace(text, null, runtime.word(translation));
-          if (link.getAttribute('aria-label') === source) runtime.replace(link, 'aria-label', runtime.word(translation));
+          if (runtime.source(link, 'aria-label') === source) runtime.replace(link, 'aria-label', runtime.word(translation));
         }
       }
     }
