@@ -13,11 +13,13 @@ let repositoryCheck;
 
 async function supportedPage(tab) {
   if (!tab?.url) return false;
-  const { origin, pathname } = new URL(tab.url);
+  const { origin, pathname, searchParams } = new URL(tab.url);
   if (origin !== 'https://github.com') return false;
-  const route = /^\/([^/]+)\/[^/]+(?:\/(?:issues(?:\/\d+)?|pulls|pull\/\d+(?:\/(?:files|commits|checks))?|actions(?:\/.*)?|releases(?:\/.*)?|milestones(?:\/.*)?))?\/?$/.exec(pathname);
+  const route = /^\/([^/]+)\/[^/]+(?:\/(?:issues(?:\/\d+)?|pulls|compare(?:\/.+)?|pull\/\d+(?:\/(?:files|commits|checks))?|actions(?:\/.*)?|releases(?:\/.*)?|milestones(?:\/.*)?))?\/?$/.exec(pathname);
   if (!route || ['login', 'settings', 'orgs', 'users', 'marketplace', 'topics', 'collections', 'sponsors',
     'features', 'notifications', 'account', 'search', 'explore', 'apps'].includes(route[1].toLowerCase())) return false;
+  if (pathname.split('/')[3] === 'compare' &&
+      searchParams.get('expand') !== '1' && searchParams.get('quick_pull') !== '1') return false;
   if (!repositoryCheck) {
     // Chromium can queue an injection while site access is withheld.
     const probe = api.scripting.executeScript({

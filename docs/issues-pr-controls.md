@@ -6,6 +6,7 @@
 | Issue 详情页 | 开启或关闭状态、描述与活动、关闭和重新打开、复制链接、正文操作、删除确认与取消 | [issue-detail](../tests/fixtures/issue-detail.html) |
 | PR 列表 | 标题、新建拉取请求、搜索、筛选、状态和空结果 | [pr-list](../tests/fixtures/pr-list.html) |
 | PR 详情页 | 状态、详情页签、审核弹层、提交审核、合并方式与确认 | [pr-detail](../tests/fixtures/pr-detail.html)、[pr-review-lazy](../tests/fixtures/pr-review-lazy.html) |
+| PR 创建 | 正在创建 PR 的比较页标题、分支选择、表单字段提示、提交与草稿选项 | [pr-create](../tests/fixtures/pr-create.html) |
 
 固定样例通过构建后的 Chrome 扩展运行，覆盖键盘打开并关闭筛选弹层、关闭后焦点返回触发按钮、延迟挂载审核弹层、无障碍名称、严格匹配、混合文案回退，以及查询、计数、链接、标题、正文、评论、草稿和 Diff 保留。
 

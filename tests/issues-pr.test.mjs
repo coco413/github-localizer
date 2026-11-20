@@ -186,3 +186,23 @@ test('PR state follows same-node aria-hidden updates to its icon', async (t) => 
   await icon.evaluate((element) => element.removeAttribute('aria-hidden'));
   await page.getByText('Merged', { exact: true }).waitFor();
 });
+
+
+test('PR creation localizes the compare form and keeps branch names, draft values and Diff', async (t) => {
+  const page = await openFixture(t, '/compare/main...feature/example?expand=1', 'pr-create');
+  await page.getByRole('heading', { name: '创建拉取请求（PR）', exact: true }).waitFor();
+  const form = page.locator('#new_pull_request');
+  assert.equal(await form.getByRole('textbox', { name: '添加标题', exact: true }).inputValue(), 'Create pull request');
+  assert.equal(await form.getByRole('textbox', { name: '添加描述', exact: true }).inputValue(), 'Add a description');
+  assert.equal(await form.getAttribute('action'), '/octocat/Hello-World/pull-requests');
+  await form.getByRole('button', { name: '创建拉取请求（PR）', exact: true }).waitFor();
+  await form.getByRole('button', { name: '创建草稿拉取请求（PR）', exact: true }).waitFor();
+  await page.getByRole('button', { name: '基准分支： Title', exact: true }).waitFor();
+  await page.getByRole('button', { name: '比较分支： Description', exact: true }).waitFor();
+  assert.equal(await page.locator('.diff-view pre').textContent(), 'Create pull request');
+  await page.locator('.diff-view').getByRole('button', { name: 'Create draft pull request', exact: true }).waitFor();
+  await page.goto(repository + '/compare/main...feature/example');
+  await page.getByRole('heading', { name: 'Open a pull request', exact: true }).waitFor();
+  await page.goto(repository + '/compare/main...feature/example?quick_pull=1');
+  await page.getByRole('heading', { name: '创建拉取请求（PR）', exact: true }).waitFor();
+});

@@ -92,6 +92,30 @@
       [stateLinkLabel, states],
       ['h2, h3', empty],
     ],
+    compare: [
+      ['.compare-pr-header .Subhead-heading', {
+        'Open a pull request': { beginner: '创建拉取请求（PR）', professional: '创建 PR' },
+      }],
+      ['.compare-pr-header .js-toggle-range-editor-cross-repo', { 'compare across forks': '跨 Fork 比较' }],
+      ['.range-editor :is(#base-ref-selector, #head-ref-selector) > summary .Button-label > .text-bold', {
+        'base:': '基准分支：', 'compare:': '比较分支：',
+      }],
+      ['.range-editor :is(#base-ref-selector, #head-ref-selector) .SelectMenu-title', {
+        'Choose a base ref': '选择基准分支或标签', 'Choose a head ref': '选择比较分支或标签',
+      }],
+      ['#new_pull_request label[for="pull_request_title"], #new_pull_request input#pull_request_title', {
+        'Add a title': '添加标题', Title: '标题',
+      }],
+      ['#new_pull_request label[for="pull_request_body"], #new_pull_request textarea#pull_request_body', {
+        'Add a description': '添加描述', Description: '描述',
+        'Add your description here...': '在此填写描述…', 'Leave a comment': '发表评论',
+      }],
+      ['#new_pull_request :is(button, [role="menuitem"], button [data-component="text"])', {
+        'Create pull request': { beginner: '创建拉取请求（PR）', professional: '创建 PR' },
+        'Create draft pull request': { beginner: '创建草稿拉取请求（PR）', professional: '创建草稿 PR' },
+        'Draft pull request': { beginner: '创建草稿拉取请求（PR）', professional: '创建草稿 PR' },
+      }],
+    ],
     pullDetail: [
       ['[data-component="StateLabel"][data-status^="pull"]', pullStates, { icon: 'Pull request' }],
       ['[data-testid="pull-request-state"], .State, .State > span', pullStates],
