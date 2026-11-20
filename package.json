@@ -8,7 +8,8 @@
     "test": "npm run build && node --test",
     "benchmark": "npm run build && node scripts/benchmark.mjs",
     "check:locales": "node scripts/check-locales.mjs",
-    "inspect:github": "node scripts/inspect-github.mjs"
+    "inspect:github": "node scripts/inspect-github.mjs",
+    "e2e:github": "npm run build && node scripts/e2e-github.mjs"
   },
   "devDependencies": {
     "@github/relative-time-element": "5.3.1",
