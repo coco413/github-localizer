@@ -2,6 +2,7 @@
   const deleteDialog = ':is(dialog, [role="dialog"]):is([aria-label="Delete issue"], [aria-label="删除议题"])';
   const reviewDialog = ':is(dialog, [role="dialog"]):is([aria-label="Review changes"], [aria-label="审核更改"])';
   const filterDialog = ':is(dialog, [role="dialog"]):is([aria-label="Filter issues"], [aria-label="筛选议题"])';
+  const authorFilter = '#__primerPortalRoot__ [role="dialog"][data-component="AnchoredOverlay"] input[type="text"][role="combobox"][data-component="input"]:is([aria-label="Filter authors"], [aria-label="筛选作者"])';
   const prTabs = 'nav:is(.tabnav-tabs, [aria-label="Pull request tabs"], [aria-label="拉取请求（PR）标签页"], [aria-label="PR 标签页"])';
   const search = 'input[type="search"], input[role="combobox"], button';
   const states = { Open: '未关闭', Closed: '已关闭' };
@@ -48,13 +49,14 @@
     },
   }];
 
-  globalThis.githubLocalizerIssuePrPortals = { issues: filterDialog, issuesDetail: deleteDialog, pullDetail: reviewDialog };
+  globalThis.githubLocalizerIssuePrPortals = { issues: `${filterDialog}, ${authorFilter}`, issuesDetail: deleteDialog, pullDetail: reviewDialog };
   globalThis.githubLocalizerIssuePrWords = {
     issues: [
       ['h1, h2', { Issues: '议题' }],
       newIssue,
       [search, { 'Search issues': '搜索议题' }],
       [filters, { ...listControls, Filters: '筛选' }],
+      [authorFilter, { 'Filter authors': '筛选作者' }],
       [filterDialog, { 'Filter issues': '筛选议题' }],
       [`${filterDialog} button`, states],
       [stateLink, states],

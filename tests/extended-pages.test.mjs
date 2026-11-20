@@ -261,3 +261,23 @@ test('a protection class added to an existing container restores its controls', 
   await toolbar.evaluate((element) => element.classList.remove('js-job-log'));
   await translated.waitFor({ timeout: 3_000 });
 });
+
+test('portaled Actions status options localize without translating labels in other pickers', { timeout: 12_000 }, async (t) => {
+  const page = await openFixture(t, '/actions', 'actions');
+  await page.getByRole('heading', { name: '所有工作流' }).waitFor({ timeout: 3_000 });
+  await page.evaluate(() => {
+    const picker = (label, options) => `<div role="dialog" data-component="AnchoredOverlay">
+      <input role="combobox" aria-label="${label}" placeholder="Filter items" data-component="input">
+      <ul role="listbox">${options.map(([id, text]) => `<li role="option" data-id="${id}" data-component="ActionList.Item">
+        <span data-component="ActionList.Item.Label">${text}</span></li>`).join('')}</ul></div>`;
+    document.body.insertAdjacentHTML('beforeend', '<div id="__primerPortalRoot__">' +
+      picker('Filter workflow options', [['workflow', 'Failure']]) +
+      picker('Filter status options', [['failure', 'Failure'], ['action_required', 'Action required']]) + '</div>');
+  });
+  await page.getByRole('option', { name: '失败', exact: true }).waitFor({ timeout: 3_000 });
+  await page.getByRole('option', { name: '需要操作', exact: true }).waitFor({ timeout: 3_000 });
+  await page.getByRole('option', { name: 'Failure', exact: true }).waitFor({ timeout: 3_000 });
+  const status = page.getByRole('dialog').filter({ has: page.getByRole('combobox', { name: 'Filter status options' }) });
+  await status.getByRole('combobox').evaluate((input) => input.setAttribute('aria-label', 'Filter event options'));
+  await page.getByRole('option', { name: 'Action required', exact: true }).waitFor({ timeout: 3_000 });
+});

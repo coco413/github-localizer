@@ -91,6 +91,15 @@ globalThis.githubLocalizerRuntime?.register('extended-pages', () => {
       Workflow: '工作流', Event: '事件', Status: '状态', Branch: '分支', Actor: '触发者',
     });
     translate(document, 'main [aria-label="Workflow run filters"] [role="menuitem"]', states);
+    const statusOptions = {
+      ...states, 'Action required': '需要操作', Completed: '已完成', Neutral: '中性',
+      Skipped: '已跳过', Stale: '已过期', 'Timed out': '已超时', Waiting: '等待中',
+    };
+    for (const dialog of runtime.matches('#__primerPortalRoot__ [role="dialog"][data-component="AnchoredOverlay"]')) {
+      if (!runtime.recheckScope(dialog)) continue;
+      if (!dialog.querySelector('input[role="combobox"][data-component="input"][aria-label="Filter status options"]')) continue;
+      translate(dialog, '[role="option"][data-component="ActionList.Item"] [data-component="ActionList.Item.Label"]', statusOptions);
+    }
     translate(document, 'main .blankslate h2, main [aria-label="Workflow runs results"] h2', {
       'No workflow runs': '没有工作流运行记录',
     });

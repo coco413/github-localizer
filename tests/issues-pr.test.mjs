@@ -138,3 +138,19 @@ test('a lazily opened review dialog localizes controls added after its accessibl
   await review.waitFor({ state: 'hidden' });
   assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
 });
+
+test('the portaled Issues author filter localizes its placeholder and accessible name', async (t) => {
+  const page = await openFixture(t, '/issues', 'issues-list');
+  await page.getByRole('searchbox', { name: '搜索议题' }).waitFor();
+  await page.evaluate(() => document.body.insertAdjacentHTML('beforeend', `
+    <div id="__primerPortalRoot__"><div role="dialog" data-component="AnchoredOverlay">
+      <input type="text" role="combobox" aria-label="Filter authors" placeholder="Filter authors" data-component="input" value="author:">
+      <ul role="listbox"><li role="option">Filter authors</li></ul>
+    </div></div><input role="combobox" aria-label="Filter authors" placeholder="Filter authors" data-component="input">`));
+  const picker = page.getByRole('dialog').getByRole('combobox', { name: '筛选作者' });
+  await picker.waitFor();
+  assert.equal(await picker.getAttribute('placeholder'), '筛选作者');
+  assert.equal(await picker.inputValue(), 'author:');
+  await page.getByRole('option', { name: 'Filter authors', exact: true }).waitFor();
+  await page.getByRole('combobox', { name: 'Filter authors', exact: true }).waitFor();
+});
