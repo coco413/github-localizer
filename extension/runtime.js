@@ -6,9 +6,9 @@
   const options = {
     subtree: true, childList: true, characterData: true, attributes: true,
     attributeFilter: [
-      'aria-label', 'placeholder', 'title', 'lang', 'datetime', 'href', 'role',
+      'aria-label', 'aria-current', 'aria-hidden', 'placeholder', 'title', 'lang', 'datetime', 'href', 'role',
       'class', 'id', 'contenteditable', 'type', 'for', 'app-name',
-      'data-content', 'data-testid', 'data-component',
+      'data-content', 'data-testid', 'data-component', 'data-status', 'data-variant',
     ],
   };
   let state = { enabled: true, mode: 'beginner', original: false };

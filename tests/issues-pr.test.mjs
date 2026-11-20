@@ -154,3 +154,35 @@ test('the portaled Issues author filter localizes its placeholder and accessible
   await page.getByRole('option', { name: 'Filter authors', exact: true }).waitFor();
   await page.getByRole('combobox', { name: 'Filter authors', exact: true }).waitFor();
 });
+
+test('the signed-out New issue link follows a same-node data-variant update', async (t) => {
+  const page = await openFixture(t, '/issues', 'issues-list');
+  const link = page.locator('a[href$="/Hello-World/issues"]');
+  await link.getByText('新建议题', { exact: true }).waitFor();
+  await link.evaluate((element) => element.setAttribute('data-variant', 'default'));
+  await link.getByText('New issue', { exact: true }).waitFor();
+  await link.evaluate((element) => element.setAttribute('data-variant', 'primary'));
+  await link.getByText('新建议题', { exact: true }).waitFor();
+});
+
+test('PR state follows same-node data-status updates', async (t) => {
+  const page = await openFixture(t, '/pull/10', 'pr-detail');
+  const state = page.locator('[data-component="StateLabel"]');
+  await page.getByText('已合并', { exact: true }).waitFor();
+  await state.evaluate((element) => element.setAttribute('data-status', 'unrecognized'));
+  await page.getByText('Merged', { exact: true }).waitFor();
+  await state.evaluate((element) => element.setAttribute('data-status', 'pullMerged'));
+  await page.getByText('已合并', { exact: true }).waitFor();
+});
+
+test('PR state follows same-node aria-hidden updates to its icon', async (t) => {
+  const page = await openFixture(t, '/pull/10', 'pr-detail');
+  await page.getByText('已合并', { exact: true }).waitFor();
+  const icon = page.locator('[data-component="StateLabel"] svg');
+  await icon.evaluate((element) => element.removeAttribute('aria-label'));
+  await page.getByText('Merged', { exact: true }).waitFor();
+  await icon.evaluate((element) => element.setAttribute('aria-hidden', 'true'));
+  await page.getByText('已合并', { exact: true }).waitFor();
+  await icon.evaluate((element) => element.removeAttribute('aria-hidden'));
+  await page.getByText('Merged', { exact: true }).waitFor();
+});

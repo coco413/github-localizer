@@ -281,3 +281,13 @@ test('portaled Actions status options localize without translating labels in oth
   await status.getByRole('combobox').evaluate((input) => input.setAttribute('aria-label', 'Filter event options'));
   await page.getByRole('option', { name: 'Action required', exact: true }).waitFor({ timeout: 3_000 });
 });
+
+test('workflow summary follows a same-node aria-current update', { timeout: 12_000 }, async (t) => {
+  const page = await openFixture(t, '/actions/runs/42', 'action-run');
+  const summary = page.locator('a[href$="/runs/42"]').filter({ has: page.locator('[data-component="ActionList.Item.Label"]') });
+  await summary.getByText('摘要', { exact: true }).waitFor({ timeout: 3_000 });
+  await summary.evaluate((link) => link.removeAttribute('aria-current'));
+  await summary.getByText('Summary', { exact: true }).waitFor({ timeout: 3_000 });
+  await summary.evaluate((link) => link.setAttribute('aria-current', 'page'));
+  await summary.getByText('摘要', { exact: true }).waitFor({ timeout: 3_000 });
+});
