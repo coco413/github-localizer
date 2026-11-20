@@ -22,3 +22,5 @@
 登录后样例使用专用测试账号。将 Playwright storage state JSON 保存为仓库 secret `INSPECTION_AUTH_STATE`，本地可用 `INSPECTION_AUTH_STATE_FILE` 指向私密文件。过期会话及无法打开的必测菜单均标记「未完成」。
 
 本地复跑沿用前一个报告的时间记录，Actions 从上一份可用报告恢复记录，已消失的发现也保留在 `lifecycle`。已建单发现还可从 Issue 中恢复首次发现时间。长期保存的发布证据可通过上述 lifecycle 文件合并。
+
+GitHub 只会按默认分支上的 workflow 触发定时巡检。本仓库的默认分支是 `main`，集成 PR 先进入 `dev`。将 workflow 随发布流程合入 `main` 后，定时巡检才会生效。首次手动派发也要求默认分支已包含该 workflow。
