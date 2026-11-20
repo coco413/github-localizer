@@ -47,16 +47,16 @@ test('the installed Chrome candidate reports GitHub as unauthorized and leaves t
 
   await popup.getByText('未授权', { exact: true }).waitFor();
   await popup.getByRole('button', { name: '授权 GitHub' }).waitFor();
-  assert.equal(await page.locator('#code-tab').innerText(), 'Code');
+  assert.equal(await page.locator('nav [data-content="Code"]').innerText(), 'Code');
 });
 
-test('an authorized candidate localizes an already loaded repository offline and preserves content and links', { timeout: 10_000 }, async (t) => {
+test('an authorized candidate localizes an already loaded repository offline and preserves content and links', { timeout: 7_000 }, async (t) => {
   const { context, directory } = await openBrowser(t);
   const page = await context.newPage();
   await page.goto(repository);
   const requests = [];
   page.on('request', (request) => requests.push(request.url()));
-  assert.equal(await page.locator('#code-tab').innerText(), 'Code');
+  assert.equal(await page.locator('nav [data-content="Code"]').innerText(), 'Code');
   await context.setOffline(true);
 
   // Chromium controls the confirmation dialog outside the page. Load a fixture
@@ -74,8 +74,8 @@ test('an authorized candidate localizes an already loaded repository offline and
   assert.equal(await page.evaluate(() => navigator.onLine), false);
   await page.getByRole('link', { name: '代码' }).waitFor();
   await page.getByRole('link', { name: '拉取请求（PR）' }).waitFor();
-  assert.equal(await page.locator('#issues-tab span').last().textContent(), '3');
-  assert.equal(await page.locator('#pull-requests-tab').getAttribute('href'), '/octocat/Hello-World/pulls');
+  assert.equal(await page.locator('nav a[href$="/issues"] span').last().textContent(), '3');
+  assert.equal(await page.locator('nav a[href$="/pulls"]').getAttribute('href'), '/octocat/Hello-World/pulls');
   assert.equal(await page.locator('#repository-container-header a').innerText(), 'Hello-World');
   assert.equal(await page.locator('article').innerText(), 'Code Pull requests');
   assert.deepEqual(requests, []);
@@ -83,7 +83,7 @@ test('an authorized candidate localizes an already loaded repository offline and
   await page.goto(repository);
   await page.getByRole('link', { name: '代码' }).waitFor();
   await page.goto('https://example.org/octocat/Hello-World');
-  assert.equal(await page.locator('#code-tab').innerText(), 'Code');
+  assert.equal(await page.locator('nav [data-content="Code"]').innerText(), 'Code');
   await page.goto(`${repository}/issues`);
-  assert.equal(await page.locator('#code-tab').innerText(), 'Code');
+  assert.equal(await page.locator('nav [data-content="Code"]').innerText(), 'Code');
 });
