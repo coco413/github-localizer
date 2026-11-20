@@ -79,7 +79,7 @@ test('approving the popup request enables translation on already open GitHub tab
   await setImmediate();
   assert.equal(status.textContent, '已启用');
   assert.deepEqual(calls, [
-    ['register', 'https://github.com/*', 'repository-words.js', 'content.js'],
-    ['execute', 42, 'repository-words.js', 'content.js'],
+    ['register', 'https://github.com/*', 'repository-words.js', 'extended-pages.js', 'content.js'],
+    ['execute', 42, 'repository-words.js', 'extended-pages.js', 'content.js'],
   ]);
 });
