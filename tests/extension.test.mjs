@@ -195,7 +195,7 @@ test('the popup rejects GitHub routes without repository metadata', { timeout: 1
   }
 });
 
-test('revocation restores the page immediately and renewed authorization applies saved settings', { timeout: 15_000 }, async (t) => {
+test('authorization, saved modes and dynamic translation work together across repository and milestone fixtures', { timeout: 15_000 }, async (t) => {
   const { context, directory } = await openBrowser(t);
   // A popup opened as a tab cannot receive activeTab. Expose the active URL to
   // this fixture through tabs so it can report the state after revocation.
@@ -206,6 +206,22 @@ test('revocation restores the page immediately and renewed authorization applies
   await showPopupFor(popup, page);
   await popup.getByRole('combobox', { name: '译法档位' }).selectOption('professional');
   await page.getByRole('link', { name: 'PR', exact: true }).waitFor();
+
+  const milestones = await context.newPage();
+  await milestones.goto(repository + '/milestones');
+  await milestones.getByRole('link', { name: '进行中 2', exact: true }).waitFor();
+  const title = milestones.getByRole('heading', { name: 'Open', exact: true });
+  await title.waitFor();
+  const tab = milestones.getByTestId('open-milestone-tab');
+  const refreshOpenTab = (count) => tab.evaluate((link, count) => {
+    const label = document.createElement('div');
+    label.textContent = 'Open';
+    const badge = document.createElement('span');
+    badge.textContent = count;
+    link.replaceChildren(label, ' ', badge);
+  }, count);
+  await refreshOpenTab('3');
+  await milestones.getByRole('link', { name: '进行中 3', exact: true }).waitFor();
 
   const id = new URL(popup.url()).hostname;
   const settings = await context.newPage();
@@ -225,14 +241,22 @@ test('revocation restores the page immediately and renewed authorization applies
   await setSiteAccess('ON_CLICK');
   await popup.getByText('未授权', { exact: true }).waitFor();
   await page.getByRole('link', { name: 'Pull requests' }).waitFor();
+  await milestones.getByRole('link', { name: 'Open 3', exact: true }).waitFor();
+  await refreshOpenTab('4');
   await page.evaluate(() => {
     const link = document.querySelector('nav a[href$="/pulls"]');
     link.replaceWith(link.cloneNode(true));
   });
   assert.equal(await page.locator('[data-content="Pull requests"]').innerText(), 'Pull requests');
+  const english = milestones.getByRole('link', { name: 'Open 4', exact: true });
+  await english.click({ trial: true });
+  assert.equal(await english.getAttribute('href'), '/octocat/Hello-World/milestones');
+
   await setSiteAccess('ON_ALL_SITES');
   await popup.getByText('已启用', { exact: true }).waitFor();
   await page.getByRole('link', { name: 'PR', exact: true }).waitFor();
+  await milestones.getByRole('link', { name: '进行中 4', exact: true }).waitFor();
+  assert.equal(await title.innerText(), 'Open');
 });
 
 test('a new browser session restores the saved mode and global switch and clears the page override', { timeout: 15_000 }, async (t) => {
