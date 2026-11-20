@@ -277,8 +277,11 @@ test('portaled Actions status options localize without translating labels in oth
   await page.getByRole('option', { name: '失败', exact: true }).waitFor({ timeout: 3_000 });
   await page.getByRole('option', { name: '需要操作', exact: true }).waitFor({ timeout: 3_000 });
   await page.getByRole('option', { name: 'Failure', exact: true }).waitFor({ timeout: 3_000 });
-  const status = page.getByRole('dialog').filter({ has: page.getByRole('combobox', { name: 'Filter status options' }) });
-  await status.getByRole('combobox').evaluate((input) => input.setAttribute('aria-label', 'Filter event options'));
+  const combobox = page.getByRole('combobox', { name: '筛选状态选项', exact: true });
+  await combobox.waitFor({ timeout: 3_000 });
+  await combobox.fill('failure');
+  await combobox.evaluate((input) => input.setAttribute('aria-label', 'Filter event options'));
+  assert.equal(await page.getByRole('combobox', { name: 'Filter event options' }).inputValue(), 'failure');
   await page.getByRole('option', { name: 'Action required', exact: true }).waitFor({ timeout: 3_000 });
 });
 
@@ -290,4 +293,17 @@ test('workflow summary follows a same-node aria-current update', { timeout: 12_0
   await summary.getByText('Summary', { exact: true }).waitFor({ timeout: 3_000 });
   await summary.evaluate((link) => link.setAttribute('aria-current', 'page'));
   await summary.getByText('摘要', { exact: true }).waitFor({ timeout: 3_000 });
+});
+
+
+test('failed job localizes fixed status and step controls while preserving names and log contents', { timeout: 12_000 }, async (t) => {
+  const page = await openFixture(t, '/actions/runs/42/job/88', 'action-job');
+  await page.getByRole('heading', { name: '注解', exact: true }).waitFor({ timeout: 3_000 });
+  await page.getByRole('button', { name: '展开', exact: true }).waitFor({ timeout: 3_000 });
+  assert.match(await page.locator('.CheckRun-log-title > .js-updatable-content').textContent(), /失败\s+Nov 20, 2026 in 38m 37s/);
+  assert.equal(await page.locator('check-step button svg').getAttribute('title'), '此步骤失败');
+  assert.equal(await page.getByRole('button', { name: 'This step failed', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('link', { name: 'failed', exact: true }).getAttribute('href'), '#logs');
+  assert.equal(await page.locator('pre').innerText(), 'failed\nShow more\nThis step failed');
+  assert.equal(await page.locator('[data-target="annotation-message.annotationContainer"]').innerText(), 'This step failed');
 });

@@ -74,6 +74,35 @@ globalThis.githubLocalizerRuntime?.register('extended-pages', () => {
         Status: '状态', 'Total duration': '总耗时', Artifacts: '构建产物',
       });
       translate(document, 'main [aria-label="Workflow run summary"] span.h4', states);
+      if (/^\/job\/\d+$/.test(path.slice(repository.length + run[0].length))) {
+        translate(document, 'main [role="region"][aria-label="Annotations"] job-annotations h2', {
+          Annotations: '注解',
+        });
+        translate(document, 'main job-annotations annotation-message button[data-target^="annotation-message.show"]', {
+          'Show more': '展开', 'Show less': '收起',
+        });
+        translate(document, 'main [aria-label="Check run summary"] .js-check-run-blankslate h4, main [aria-label="Check run summary"].js-zen-blankslate h4', {
+          'The logs for this run have expired and are no longer available.': '此次运行的日志已过期，无法查看。',
+          'Re-running jobs...': '正在重新运行作业…',
+        });
+        translate(document, 'main #logs .js-checks-log-toolbar .CheckRun-log-title > .js-updatable-content', {
+          failed: '失败', succeeded: '成功', cancelled: '已取消', skipped: '已跳过',
+        });
+        const stepTitles = {
+          'This step failed': '此步骤失败',
+          'This step passed': '此步骤通过',
+          'This step timed out': '此步骤超时',
+          'This step was cancelled': '此步骤已取消',
+          'This step was skipped': '此步骤已跳过',
+          'This step was neutral': '此步骤状态为中性',
+          'This step requires action with the application': '此步骤需要在应用程序中执行操作',
+        };
+        for (const icon of runtime.matches('main #logs check-steps check-step svg[data-component="Octicon"][title]')) {
+          if (icon.closest('.js-job-log, .markdown-body, pre, code, [contenteditable]')) continue;
+          const title = runtime.source(icon, 'title');
+          if (Object.hasOwn(stepTitles, title)) runtime.replace(icon, 'title', runtime.word(stepTitles[title]));
+        }
+      }
       return;
     }
     for (const link of runtime.matches('main nav[aria-label="Workflows"] a[href]')) {
@@ -97,7 +126,9 @@ globalThis.githubLocalizerRuntime?.register('extended-pages', () => {
     };
     for (const dialog of runtime.matches('#__primerPortalRoot__ [role="dialog"][data-component="AnchoredOverlay"]')) {
       if (!runtime.recheckScope(dialog)) continue;
-      if (!dialog.querySelector('input[role="combobox"][data-component="input"][aria-label="Filter status options"]')) continue;
+      const filter = dialog.querySelector('input[role="combobox"][data-component="input"][aria-label]');
+      if (!filter || runtime.source(filter, 'aria-label') !== 'Filter status options') continue;
+      runtime.replace(filter, 'aria-label', runtime.word('筛选状态选项'));
       translate(dialog, '[role="option"][data-component="ActionList.Item"] [data-component="ActionList.Item.Label"]', statusOptions);
     }
     translate(document, 'main .blankslate h2, main [aria-label="Workflow runs results"] h2', {

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Failed job fixture</title></head>
+<body>
+<main>
+  <div role="region" aria-label="Annotations">
+    <job-annotations>
+      <h2>Annotations</h2>
+      <annotation-message>
+        <div data-target="annotation-message.annotationContainer">This step failed</div>
+        <button data-target="annotation-message.showMoreButton">Show more</button>
+      </annotation-message>
+    </job-annotations>
+  </div>
+  <section aria-label="Check run summary">
+    <div id="logs" class="CheckRun js-check-steps">
+      <div class="CheckRun-header js-checks-log-toolbar">
+        <span class="CheckRun-log-title">
+          <div><a href="#logs" id="check-step-header-title"><span class="two-line-wrapping">failed</span></a></div>
+          <span class="js-updatable-content" data-url="/octocat/Hello-World/runs/88/header">
+            failed
+            <relative-time datetime="2026-11-20T13:14:09Z">Nov 20, 2026</relative-time> in 38m 37s
+          </span>
+        </span>
+      </div>
+      <div class="js-full-logs-container">
+        <check-steps data-job-status="completed">
+          <check-step data-name="This step failed" data-number="2" data-conclusion="failure">
+            <button>
+              <svg data-component="Octicon" title="This step failed" aria-hidden="true"></svg>
+              <span class="CheckStep-titleName">This step failed</span>
+            </button>
+            <div class="js-job-log"><pre>failed
+Show more
+This step failed</pre></div>
+          </check-step>
+        </check-steps>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
