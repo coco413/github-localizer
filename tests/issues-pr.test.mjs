@@ -59,6 +59,8 @@ test('the Issues filter opens by keyboard and localizes its menu while preservin
   await open.waitFor();
   assert.equal(await open.evaluate((element) => element === document.activeElement), true);
   await open.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await filters.evaluate((element) => element === document.activeElement), true);
   await page.getByRole('link', { name: '未关闭 3', exact: true }).waitFor();
   await page.getByRole('heading', { name: '没有结果', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Open', exact: true }).waitFor();
@@ -88,7 +90,13 @@ test('PR list localizes only the compare link and preserves a PR title with iden
   await page.getByRole('link', { name: 'New pull request', exact: true }).waitFor();
   await page.getByRole('heading', { name: '所有拉取请求（PR）', exact: true }).waitFor();
   await page.getByRole('heading', { name: '没有结果', exact: true }).waitFor();
-  assert.equal(await page.getByRole('searchbox', { name: '搜索拉取请求（PR）', exact: true }).inputValue(), 'is:pr state:open');
+  const search = page.getByRole('combobox', { name: '搜索拉取请求（PR）', exact: true });
+  assert.equal(await search.inputValue(), 'is:pr state:open');
+  assert.equal(await search.getAttribute('placeholder'), '搜索拉取请求（PR）');
+  await page.getByRole('button', { name: '清除筛选条件', exact: true }).waitFor();
+  await page.getByRole('button', { name: '按作者筛选', exact: true }).waitFor();
+  await page.getByRole('link', { name: /未关闭/ }).waitFor();
+  assert.equal(await page.locator('[data-component="CounterLabel"]').textContent(), '3');
 });
 
 test('PR detail localizes review and merge controls while preserving the title, draft and Diff', async (t) => {
@@ -105,4 +113,18 @@ test('PR detail localizes review and merge controls while preserving the title, 
   assert.equal(await page.locator('textarea').inputValue(), 'Merge pull request');
   assert.equal(await page.locator('.diff-view button').textContent(), 'Review changes');
   assert.equal(await page.locator('.diff-view pre').textContent(), 'Confirm merge');
+});
+
+test('a lazily opened review dialog localizes controls added after its accessible name changes', async (t) => {
+  const page = await openFixture(t, '/pull/10', 'pr-review-lazy');
+  const trigger = page.getByRole('button', { name: '审核更改', exact: true });
+  await trigger.press('Enter');
+  const review = page.getByRole('dialog', { name: '审核更改', exact: true });
+  await review.waitFor();
+  await review.getByRole('button', { name: '添加审核选项', exact: true }).press('Enter');
+  const submit = review.getByRole('button', { name: '提交审核', exact: true });
+  await submit.waitFor();
+  await submit.press('Escape');
+  await review.waitFor({ state: 'hidden' });
+  assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
 });

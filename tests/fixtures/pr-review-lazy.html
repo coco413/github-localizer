@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Review changes · GitHub</title>
+<main><div id="repo-content-pjax-container">
+  <button id="trigger" type="button">Review changes</button>
+  <template id="review-template">
+    <dialog aria-label="Review changes">
+      <button id="add-options" type="button">添加审核选项</button>
+    </dialog>
+  </template>
+</div></main>
+<script>
+  document.querySelector('#trigger').onclick = () => {
+    const dialog = document.querySelector('#review-template').content.firstElementChild.cloneNode(true);
+    document.body.append(dialog);
+    dialog.querySelector('#add-options').onclick = () => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.textContent = 'Submit review';
+      dialog.append(option);
+    };
+    dialog.showModal();
+  };
+</script>

@@ -1,9 +1,23 @@
 <!doctype html>
 <title>Pull requests · GitHub</title>
-<main><div id="repo-content-pjax-container">
-  <h1>All pull requests</h1>
-  <input type="search" aria-label="Search pull requests" value="is:pr state:open">
-  <a href="/octocat/Hello-World/compare">New pull request</a>
-  <h2>No results</h2>
-  <a href="/octocat/Hello-World/pull/10">New pull request</a>
-</div></main>
+<div id="repo-content-pjax-container">
+  <react-app app-name="repo">
+    <h1 data-testid="header-title">All pull requests</h1>
+    <div role="search" aria-label="Pull requests">
+      <div id="repo-pulls-dashboard-filter" role="form" aria-label="Search pull requests">
+        <label for="repo-pulls-dashboard-filter-input">Search pull requests</label>
+        <input id="repo-pulls-dashboard-filter-input" role="combobox" placeholder="Search pull requests" value="is:pr state:open">
+        <button type="button" aria-label="Clear filter"><span></span></button>
+      </div>
+    </div>
+    <a href="/octocat/Hello-World/compare" data-component="Button"><span data-component="buttonContent"><span data-component="text">New pull request</span></span></a>
+    <div id="example-list-view-metadata">
+      <a href="?q=is%3Apr+state%3Aopen"><div>Open</div><span data-component="CounterLabel">3</span></a>
+      <div role="toolbar">
+        <button type="button" aria-label="Filter by author"><span data-component="buttonContent"><span data-component="text">Author</span></span></button>
+      </div>
+    </div>
+    <h2>No results</h2>
+    <a href="/octocat/Hello-World/pull/10">New pull request</a>
+  </react-app>
+</div>
