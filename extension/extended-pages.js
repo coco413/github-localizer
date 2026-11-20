@@ -1,4 +1,5 @@
-(() => {
+globalThis.githubLocalizerRuntime?.register('extended-pages', () => {
+  const runtime = globalThis.githubLocalizerRuntime;
   if (location.origin !== 'https://github.com') return;
   const route = /^(\/[^/]+\/[^/]+)(?:\/(actions|releases|milestones)(?:\/.*)?)?\/?$/.exec(location.pathname);
   if (!route) return;
@@ -10,12 +11,20 @@
     for (const text of element.childNodes) {
       if (text.nodeType !== Node.TEXT_NODE) continue;
       const source = text.data.trim();
-      if (Object.hasOwn(words, source)) text.data = text.data.replace(source, words[source]);
+      if (Object.hasOwn(words, source)) runtime.replace(text, null, text.data.replace(source, () => runtime.word(words[source])));
     }
   }
 
   function translate(root, selector, words) {
-    for (const element of root.querySelectorAll(selector)) translateText(element, words);
+    for (const element of runtime.matches(selector, root)) translateText(element, words);
+  }
+
+  if (page) {
+    for (const time of runtime.matches('main relative-time[datetime]')) {
+      if (!time.closest('.markdown-body, pre, code, [contenteditable], .js-job-log')) {
+        runtime.replace(time, 'lang', 'zh-CN');
+      }
+    }
   }
 
   if (!page) {
@@ -33,9 +42,9 @@
       'Star this repository': '为此仓库加星标',
       'Unstar this repository': '移除此仓库的星标',
     };
-    for (const button of home.querySelectorAll('[data-testid="repo-header-actions"] [aria-label]')) {
+    for (const button of runtime.matches('[data-testid="repo-header-actions"] [aria-label]', home)) {
       const source = button.getAttribute('aria-label');
-      if (Object.hasOwn(labels, source)) button.setAttribute('aria-label', labels[source]);
+      if (Object.hasOwn(labels, source)) runtime.replace(button, 'aria-label', runtime.word(labels[source]));
     }
     translate(home, '[class*="sidebarSection__"] > h2 > span', {
       About: '关于', Releases: '发布版本', Packages: '软件包', Contributors: '贡献者', Languages: '语言',
@@ -56,11 +65,11 @@
       translate(document, 'main [aria-label="Workflow run summary"] span.h4', states);
       return;
     }
-    for (const link of document.querySelectorAll('main nav[aria-label="Workflows"] a[href]')) {
+    for (const link of runtime.matches('main nav[aria-label="Workflows"] a[href]')) {
       if (link.origin === location.origin && link.pathname === repository + '/actions') {
         const words = { 'All workflows': '所有工作流' };
         translateText(link, words);
-        translate(link, ':scope > span', words);
+        for (const child of link.children) if (child.matches('span')) translateText(child, words);
       }
     }
     translate(document, 'main nav[aria-label="Workflows"] h2 > span', { Workflows: '工作流' });
@@ -79,11 +88,11 @@
 
   if (page === 'releases') {
     const navigation = { Releases: '发布版本', Tags: '标签' };
-    for (const link of document.querySelectorAll('main nav[aria-label="Releases and tags"] a[href]')) {
+    for (const link of runtime.matches('main nav[aria-label="Releases and tags"] a[href]')) {
       if (link.origin !== location.origin || link.hash) continue;
       if (link.pathname === repository + '/releases' || link.pathname === repository + '/tags') {
         translateText(link, navigation);
-        translate(link, ':scope > span', navigation);
+        for (const child of link.children) if (child.matches('span')) translateText(child, navigation);
       }
     }
     if (path === repository + '/releases') {
@@ -103,10 +112,10 @@
 
   if (path !== repository + '/milestones') return;
   const states = { Open: '进行中', Closed: '已关闭' };
-  for (const link of document.querySelectorAll('main a[data-testid$="-milestone-tab"]')) {
+  for (const link of runtime.matches('main a[data-testid$="-milestone-tab"]')) {
     if (link.origin !== location.origin || link.pathname !== repository + '/milestones') continue;
     translateText(link, states);
-    translate(link, ':scope > :is(span, div)', states);
+    for (const child of link.children) if (child.matches('span, div')) translateText(child, states);
   }
   translate(document, 'main h1[data-component="PH_Title"]', { Milestones: '里程碑' });
   translate(document, 'main [aria-label="Milestones"] [role="toolbar"] button [data-component="text"]', {
@@ -115,4 +124,4 @@
   translate(document, 'main [aria-label="Milestones"] [data-component="Blankslate.Heading"]', {
     'You haven’t created any Milestones.': '你还没有创建任何里程碑。',
   });
-})();
+});

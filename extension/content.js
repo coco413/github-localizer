@@ -1,11 +1,13 @@
-(() => {
+globalThis.githubLocalizerRuntime?.register('repository-navigation', () => {
+  const runtime = globalThis.githubLocalizerRuntime;
   if (location.origin !== 'https://github.com' || !/^\/[^/]+\/[^/]+\/?$/.test(location.pathname)) return;
 
   const homePath = location.pathname.replace(/\/$/, '');
   const navigation = document.querySelector(
     'nav[aria-label="Repository"], nav[aria-label="Repository navigation"]',
   );
-  const links = Array.from(navigation?.querySelectorAll('a[href]') ?? []).filter(
+  if (!navigation) return;
+  const links = Array.from(navigation.querySelectorAll('a[href]')).filter(
     (link) => link.origin === location.origin,
   );
   const codeTab = links.find(
@@ -14,16 +16,17 @@
   if (!codeTab) return;
 
   for (const [suffix, entries] of Object.entries(globalThis.githubLocalizerRepositoryWords)) {
-    for (const link of links) {
+    for (const link of runtime.matches('a[href]', navigation)) {
+      if (link.origin !== location.origin) continue;
       if (link.pathname.replace(/\/$/, '') !== homePath + suffix) continue;
       for (const [source, translation] of Object.entries(entries)) {
         const label = link.querySelector(`span[data-content="${source}"]`);
         const text = label?.firstChild;
         if (label?.childNodes.length === 1 && text.nodeType === Node.TEXT_NODE && text.data === source) {
-          text.data = translation;
-          if (link.getAttribute('aria-label') === source) link.setAttribute('aria-label', translation);
+          runtime.replace(text, null, runtime.word(translation));
+          if (link.getAttribute('aria-label') === source) runtime.replace(link, 'aria-label', runtime.word(translation));
         }
       }
     }
   }
-})();
+});
