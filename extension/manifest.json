@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub 译伴",
+  "version": "1.0.0",
+  "description": "在浏览器中离线汉化 GitHub 界面。",
+  "permissions": ["scripting"],
+  "optional_host_permissions": ["https://github.com/*"],
+  "action": { "default_popup": "popup.html" }
+}
