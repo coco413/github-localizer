@@ -36,3 +36,32 @@ E2E 使用一次性浏览器配置和打包目录的临时副本。副本预授�
 | Firefox 160.0.1 | 通过（WebDriver BiDi，重启后重新装载临时扩展） | 未验证 |
 
 公开巡检探测了 13 个页面与状态。作者筛选提示和 Actions 菜单中的 Success、Failure、Cancelled、Queued、In progress 存在翻译差异。报告标为未完成，因为缺少专用仓库和专用账号；首次提交 PR、处理审核和定位失败日志三项待跑。 Safari 和商店发布包测试待跑。
+
+### 自动核对专用仓库
+
+将专用账号登录后的 Playwright storage state JSON 存在仓库外，并创建以下结构的 fixture JSON，替换其中的占位值。对比使用尚无 PR 的样例分支。已有的 PR、审核评论、失败工作流和任务来自前述手动验收。所有文本都使用便于精确匹配的无敏感信息样例标记。
+
+```json
+{
+  "dedicated": true,
+  "repository": "test-owner/localizer-e2e",
+  "actor": "test-owner",
+  "baseBranch": "main",
+  "fixtureBranch": "e2e/new-pr",
+  "pull": 1,
+  "pullTitle": "E2E staged pull request",
+  "reviewText": "E2E review comment",
+  "run": 123,
+  "job": 456,
+  "logText": "E2E sample failure"
+}
+```
+
+```sh
+E2E_FIXTURE_FILE=/path/to/fixture.json E2E_SESSION_FILE=/path/to/storage-state.json \
+  npm run e2e:github -- chrome --dedicated
+```
+
+脚本核对账号和仓库路径，限制主导航到专用仓库，且仅允许只读请求。它检查新建 PR 表单、已有 PR 标题与审核评论、失败工作流进入任务后的日志文本。创建 PR、提交审核及修改会话仍由测试人员在专用仓库实际操作。如果 GitHub 页面需要被过滤的请求或日志需要人工展开，记录自动核对失败，随后补做手动验证。请勿提交 session 文件。
+
+Firefox 可使用官方浏览器的新配置复跑冷启动场景。先完成 `npm run build`，通过 `about:debugging#/runtime/this-firefox` 临时载入 `dist/firefox/manifest.json`，授权 GitHub 并完全退出。重新启动后重新装载临时扩展并授权，然后首次打开仓库页，按上文操作。临时扩展重启即移除。商店安装验收使用持久安装，重启后直接打开 GitHub。

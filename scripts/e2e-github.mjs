@@ -3,12 +3,14 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright';
+import { dedicatedConfig, verifyDedicated } from './e2e-dedicated.mjs';
 
 const repository = 'https://github.com/microsoft/playwright';
 const query = 'repo:microsoft/playwright is:issue';
 const timeout = 15_000;
 const target = process.argv[2] ?? 'chromium';
 assert.ok(['chromium', 'chrome', 'edge'].includes(target), 'Use chromium, chrome or edge');
+const dedicated = process.argv.includes('--dedicated') ? await dedicatedConfig(process.env) : null;
 const workspace = await mkdtemp(join(tmpdir(), 'github-localizer-e2e-'));
 const extension = join(workspace, 'extension');
 
@@ -22,6 +24,7 @@ function launch(args = []) {
     viewport: { width: 1280, height: 900 },
     headless: process.env.E2E_HEADED !== '1',
     args,
+    serviceWorkers: dedicated ? 'block' : 'allow',
   });
 }
 
@@ -74,50 +77,58 @@ try {
     await install(browser);
     const page = browser.pages()[0];
     page.setDefaultTimeout(timeout);
-    const openRepository = async () => {
-      const response = await page.goto(repository);
-      assert.equal(response?.status(), 200);
-      await page.getByRole('link', { name: /^代码$/ }).waitFor();
-    };
-
-    await scenario('cold search opens, accepts keyboard input and submits', async () => {
-      await openRepository();
-      const trigger = page.locator('header button[aria-haspopup="dialog"]').filter({ visible: true })
-        .and(page.getByRole('button', { name: /Search|搜索/i }));
-      await trigger.first().click();
-      const input = page.getByRole('dialog').locator('input:visible').first();
-      await input.waitFor();
-      await input.fill('');
-      await input.pressSequentially(query);
-      assert.equal(await input.inputValue(), query);
-      await Promise.all([
-        page.waitForURL(url => url.origin === 'https://github.com' &&
-          url.pathname === '/search' && url.searchParams.get('q') === query),
-        input.press('Enter'),
-      ]);
-    });
-
-    await scenario('repository navigation and Issue author filter respond to keyboard', async () => {
-      await openRepository();
-      const nav = page.locator('nav[aria-label^="Repository"]');
-      await Promise.all([
-        page.waitForURL(`${repository}/issues`),
-        nav.locator('a[href$="/issues"]').click(),
-      ]);
-      const authors = page.locator('main button[data-testid="authors-anchor-button"]');
-      const filter = page.locator('[role="dialog"][data-component="AnchoredOverlay"] input');
-      await authors.press('Enter');
-      const opened = await filter.waitFor({ timeout: 1500 }).then(() => true, () => false);
-      if (!opened && await authors.getAttribute('aria-expanded') === 'false') {
-        await authors.press('Enter');
-      }
-      await filter.waitFor();
-      await page.keyboard.press('Escape');
-      await filter.waitFor({ state: 'hidden' });
-    });
+    if (dedicated) {
+      await verifyDedicated(browser, page, dedicated, scenario);
+    } else {
+      await verifyPublic(page);
+    }
   } finally {
     await browser.close();
   }
 } finally {
   await rm(workspace, { recursive: true, force: true });
+}
+
+async function verifyPublic(page) {
+  const openRepository = async () => {
+    const response = await page.goto(repository);
+    assert.equal(response?.status(), 200);
+    await page.getByRole('link', { name: /^代码$/ }).waitFor();
+  };
+
+  await scenario('cold search opens, accepts keyboard input and submits', async () => {
+    await openRepository();
+    const trigger = page.locator('header button[aria-haspopup="dialog"]').filter({ visible: true })
+      .and(page.getByRole('button', { name: /Search|搜索/i }));
+    await trigger.first().click();
+    const input = page.getByRole('dialog').locator('input:visible').first();
+    await input.waitFor();
+    await input.fill('');
+    await input.pressSequentially(query);
+    assert.equal(await input.inputValue(), query);
+    await Promise.all([
+      page.waitForURL(url => url.origin === 'https://github.com' &&
+        url.pathname === '/search' && url.searchParams.get('q') === query),
+      input.press('Enter'),
+    ]);
+  });
+
+  await scenario('repository navigation and Issue author filter respond to keyboard', async () => {
+    await openRepository();
+    const nav = page.locator('nav[aria-label^="Repository"]');
+    await Promise.all([
+      page.waitForURL(`${repository}/issues`),
+      nav.locator('a[href$="/issues"]').click(),
+    ]);
+    const authors = page.locator('main button[data-testid="authors-anchor-button"]');
+    const filter = page.locator('[role="dialog"][data-component="AnchoredOverlay"] input');
+    await authors.press('Enter');
+    const opened = await filter.waitFor({ timeout: 1500 }).then(() => true, () => false);
+    if (!opened && await authors.getAttribute('aria-expanded') === 'false') {
+      await authors.press('Enter');
+    }
+    await filter.waitFor();
+    await page.keyboard.press('Escape');
+    await filter.waitFor({ state: 'hidden' });
+  });
 }
