@@ -1,0 +1,57 @@
+name: GitHub interface inspection
+
+on:
+  schedule:
+    - cron: '27 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Require a complete inspection before release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-interface-inspection
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.repository == 'coco413/github-localizer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    env:
+      INSPECTION_SAMPLE_REPO: ${{ vars.INSPECTION_SAMPLE_REPO }}
+      INSPECTION_SAMPLE_ISSUE: ${{ vars.INSPECTION_SAMPLE_ISSUE }}
+      INSPECTION_SAMPLE_PULL: ${{ vars.INSPECTION_SAMPLE_PULL }}
+      INSPECTION_SAMPLE_RUN: ${{ vars.INSPECTION_SAMPLE_RUN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check:locales
+      - if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run inspect:github -- --publish
+      - if: github.event_name == 'workflow_dispatch' && !inputs.release
+        run: npm run inspect:github
+      - if: github.event_name == 'workflow_dispatch' && inputs.release
+        run: npm run inspect:github -- --release
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-interface-inspection
+          path: artifacts/github-inspection.json
+          if-no-files-found: ignore
