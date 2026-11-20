@@ -3,7 +3,7 @@ const site = 'https://github.com/*';
 const repositoryScript = {
   id: 'github-localizer',
   matches: [site],
-  js: ['repository-words.js', 'issue-pr-words.js', 'content.js', 'issue-pr.js'],
+  js: ['repository-words.js', 'issue-pr-words.js', 'extended-pages.js', 'content.js', 'issue-pr.js'],
   runAt: 'document_end',
 };
 
