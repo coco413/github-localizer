@@ -1,0 +1,16 @@
+name: R1.0 synthetic E2E failure
+on:
+  push:
+    branches:
+      - e2e/r1-0-review
+permissions:
+  contents: read
+jobs:
+  synthetic-failure:
+    name: Synthetic E2E job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Produce expected fixture failure
+        run: |
+          echo 'GitHub Localizer synthetic failure fixture'
+          exit 1
